@@ -21,6 +21,7 @@ $mech->host('www.example.org');
 
 my $BROMLEY_ID = 2482;
 my $body = $mech->create_body_ok( $BROMLEY_ID, 'Bromley Council' );
+$mech->create_contact_ok( body => $body, category => 'Lost toys', email => 'losttoys@example.net' );
 
 my $dt = DateTime->now;
 
@@ -49,11 +50,10 @@ sub create_report {
         latitude           => '51.4129',
         longitude          => '0.007831',
         user_id            => $user2->id,
-        photo              => $mech->get_photo_data,
+        photo              => '74e3362283b6ef0c48686fb0e161da4043bbcc97.jpeg',
     });
 }
 my $report = create_report();
-my $report2 = create_report();
 
 my $REPORT_URL = '/report/' . $report->id ;
 
@@ -233,34 +233,64 @@ subtest 'Problem moderation' => sub {
             is $report->detail, 'Changed detail';
         }
     };
+
+    subtest 'Moderate extra data' => sub {
+        $report->set_extra_metadata('moon', 'waxing full');
+        $report->update;
+        my ($csrf) = $mech->content =~ /meta content="([^"]*)" name="csrf-token"/;
+        $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
+            %problem_prepopulated,
+            'extra.weather' => 'snow',
+            'extra.moon' => 'waxing full',
+            token => $csrf,
+        });
+        $report->discard_changes;
+        is $report->get_extra_metadata('weather'), 'snow';
+    };
+
+    subtest 'Moderate location' => sub {
+        FixMyStreet::override_config {
+            MAPIT_URL => 'http://mapit.uk/',
+            ALLOWED_COBRANDS => 'fixmystreet',
+        }, sub {
+            my ($csrf) = $mech->content =~ /meta content="([^"]*)" name="csrf-token"/;
+            $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
+                %problem_prepopulated,
+                latitude => '53',
+                longitude => '0.01578',
+                token => $csrf,
+            });
+            $report->discard_changes;
+            is $report->latitude, 51.4129, 'No change when moved out of area';
+            $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
+                %problem_prepopulated,
+                latitude => '51.4021',
+                longitude => '0.01578',
+                token => $csrf,
+            });
+            $report->discard_changes;
+            is $report->latitude, 51.4021, 'Updated when same body';
+        };
+    };
 };
 
 $mech->content_lacks('Posted anonymously', 'sanity check');
+my ($csrf) = $mech->content =~ /meta content="([^"]*)" name="csrf-token"/;
 
-subtest 'Problem 2' => sub {
-    my $REPORT2_URL = '/report/' . $report2->id ;
-    $mech->get_ok($REPORT2_URL);
-    $mech->submit_form_ok({ with_fields => {
+subtest 'Edit photos' => sub {
+    $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
         %problem_prepopulated,
-        problem_title  => 'Good good',
-        problem_detail => 'Good good improved',
-    }});
-    $mech->base_like( qr{\Q$REPORT2_URL\E} );
-
-    $report2->discard_changes;
-    is $report2->title, 'Good good';
-    is $report2->detail, 'Good good improved';
-
-    $mech->submit_form_ok({ with_fields => {
+        photo1 => 'something-wrong',
+        token => $csrf,
+    });
+    $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
         %problem_prepopulated,
-        problem_revert_title  => 1,
-        problem_revert_detail => 1,
-    }});
-    $mech->base_like( qr{\Q$REPORT2_URL\E} );
-
-    $report2->discard_changes;
-    is $report2->title, 'Good bad good';
-    is $report2->detail, 'Good bad bad bad good bad';
+        photo1 => '',
+        upload_fileid => '',
+        token => $csrf,
+    });
+    $report->discard_changes;
+    is $report->photo, undef;
 };
 
 sub create_update {
@@ -268,7 +298,7 @@ sub create_update {
         user      => $user2,
         name      => 'Test User 2',
         anonymous => 'f',
-        photo     => $mech->get_photo_data,
+        photo     => '74e3362283b6ef0c48686fb0e161da4043bbcc97.jpeg',
         text      => 'update good good bad good',
         state     => 'confirmed',
         mark_fixed => 0,

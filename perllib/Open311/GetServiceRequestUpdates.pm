@@ -9,6 +9,7 @@ use DateTime::Format::W3CDTF;
 has system_user => ( is => 'rw' );
 has start_date => ( is => 'ro', default => sub { undef } );
 has end_date => ( is => 'ro', default => sub { undef } );
+has body => ( is => 'ro', default => sub { undef } );
 has suppress_alerts => ( is => 'rw', default => 0 );
 has verbose => ( is => 'ro', default => 0 );
 has schema => ( is =>'ro', lazy => 1, default => sub { FixMyStreet::DB->schema->connect } );
@@ -29,6 +30,10 @@ sub fetch {
         }
     );
 
+    if ( $self->body ) {
+        $bodies = $bodies->search( { name => $self->body } );
+    }
+
     while ( my $body = $bodies->next ) {
 
         my %open311_conf = (
@@ -42,12 +47,12 @@ sub fetch {
         $cobrand->call_hook(open311_config_updates => \%open311_conf)
             if $cobrand;
 
-        $open311 //= Open311->new(%open311_conf);
+        my $o = $open311 || Open311->new(%open311_conf);
 
         $self->suppress_alerts( $body->suppress_alerts );
         $self->blank_updates_permitted( $body->blank_updates_permitted );
         $self->system_user( $body->comment_user );
-        $self->update_comments( $open311, $body );
+        $self->update_comments( $o, $body );
     }
 }
 

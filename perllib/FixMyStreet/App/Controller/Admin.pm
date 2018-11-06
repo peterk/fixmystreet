@@ -883,6 +883,8 @@ sub report_edit : Path('report_edit') : Args(1) {
 
     $c->forward('categories_for_point');
 
+    $c->forward('alerts_for_report');
+
     $c->forward('check_username_for_abuse', [ $problem->user ] );
 
     $c->stash->{updates} =
@@ -1080,6 +1082,8 @@ sub report_edit_location : Private {
         # this lookup is bad. So let's save the stash and restore it after the
         # comparison.
         my $safe_stash = { %{$c->stash} };
+        $c->stash->{fetch_all_areas} = 1;
+        $c->stash->{area_check_action} = 'admin';
         $c->forward('/council/load_and_check_areas', []);
         $c->forward('/report/new/setup_categories_and_bodies');
         my %allowed_bodies = map { $_ => 1 } @{$problem->bodies_str_ids};
@@ -1089,6 +1093,8 @@ sub report_edit_location : Private {
         return unless $bodies_match;
         $problem->latitude($c->stash->{latitude});
         $problem->longitude($c->stash->{longitude});
+        my $areas = $c->stash->{all_areas_mapit};
+        $problem->areas( ',' . join( ',', sort keys %$areas ) . ',' );
     }
     return 1;
 }
@@ -1109,6 +1115,17 @@ sub categories_for_point : Private {
     shift @{$c->stash->{category_options}} if @{$c->stash->{category_options}};
 
     $c->stash->{categories_hash} = { map { $_->category => 1 } @{$c->stash->{category_options}} };
+}
+
+sub alerts_for_report : Private {
+    my ($self, $c) = @_;
+
+    $c->stash->{alert_count} = $c->model('DB::Alert')->search({
+        alert_type => 'new_updates',
+        parameter => $c->stash->{report}->id,
+        confirmed => 1,
+        whendisabled => undef,
+    })->count();
 }
 
 sub templates : Path('templates') : Args(0) {
@@ -1518,6 +1535,8 @@ sub user_edit : Path('user_edit') : Args(1) {
         my %args = ( email => $email );
         $args{user_id} = $id if $user->email ne $email || !$user->email_verified;
         $c->forward('send_login_email', [ \%args ]);
+    } elsif ( $c->get_param('update_alerts') ) {
+        $c->forward('update_alerts');
     } elsif ( $c->get_param('submit') ) {
 
         my $edited = 0;
@@ -1697,6 +1716,11 @@ sub user_edit : Path('user_edit') : Args(1) {
         $c->stash->{contacts} = \@all_contacts;
     }
 
+    # this goes after in case we've delete any alerts
+    unless ( $c->cobrand->moniker eq 'zurich' ) {
+        $c->forward('user_alert_details');
+    }
+
     return 1;
 }
 
@@ -1831,6 +1855,28 @@ sub get_user : Private {
     return $user;
 }
 
+sub user_alert_details : Private {
+    my ( $self, $c ) = @_;
+
+    my @alerts = $c->stash->{user}->alerts({}, { prefetch => 'alert_type' })->all;
+    $c->stash->{alerts} = \@alerts;
+
+    my @wards;
+
+    for my $alert (@alerts) {
+        if ($alert->alert_type->ref eq 'ward_problems') {
+            push @wards, $alert->parameter2;
+        }
+    }
+
+    if (@wards) {
+        $c->stash->{alert_areas} = mySociety::MaPit::call('areas', join(',', @wards) );
+    }
+
+    my %body_names = map { $_->{id} => $_->{name} } @{ $c->stash->{bodies} };
+    $c->stash->{body_names} = \%body_names;
+}
+
 =item log_edit
 
     $c->forward( 'log_edit', [ $object_id, $object_type, $action_performed ] );
@@ -1901,6 +1947,25 @@ sub ban_user : Private {
         $c->stash->{username_in_abuse} = 1;
     }
     return 1;
+}
+
+sub update_alerts : Private {
+    my ($self, $c) = @_;
+
+    my $changes;
+    for my $alert ( $c->stash->{user}->alerts ) {
+        my $edit_option = $c->get_param('edit_alert[' . $alert->id . ']');
+        next unless $edit_option;
+        $changes = 1;
+        if ( $edit_option eq 'delete' ) {
+            $alert->delete;
+        } elsif ( $edit_option eq 'disable' ) {
+            $alert->disable;
+        } elsif ( $edit_option eq 'enable' ) {
+            $alert->confirm;
+        }
+    }
+    $c->flash->{status_message} = _("Updated!") if $changes;
 }
 
 sub user_logout_everywhere : Private {
@@ -2147,13 +2212,14 @@ sub check_page_allowed : Private {
 sub fetch_all_bodies : Private {
     my ($self, $c ) = @_;
 
-    my @bodies = $c->cobrand->call_hook('admin_fetch_all_bodies') || do {
+    my @bodies = $c->cobrand->call_hook('admin_fetch_all_bodies');
+    if (!@bodies) {
         my $bodies = $c->model('DB::Body')->search(undef, {
             columns => [ "id", "name", "deleted", "parent" ],
         })->with_parent_name;
         $bodies = $bodies->with_defect_type_count if $c->stash->{with_defect_type_count};
-        $bodies->translated->all_sorted;
-    };
+        @bodies = $bodies->translated->all_sorted;
+    }
 
     $c->stash->{bodies} = \@bodies;
 
