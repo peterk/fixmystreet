@@ -787,7 +787,7 @@ sub reports : Path('reports') {
                     -select   => [ 'me.*', qw/problem.bodies_str problem.state/ ],
                     prefetch => [qw/problem/],
                     rows => 50,
-                    order_by => [ \"(me.state='hidden')", \"(problem.state='hidden')", 'me.created' ]
+                    order_by => [ \"(me.state='hidden')", \"(problem.state='hidden')", { -desc => 'me.created' } ]
                 }
             )->page( $u_page );
             $c->stash->{updates} = [ $updates->all ];
@@ -889,7 +889,7 @@ sub report_edit : Path('report_edit') : Args(1) {
 
     $c->stash->{updates} =
       [ $c->model('DB::Comment')
-          ->search( { problem_id => $problem->id }, { order_by => 'created' } )
+          ->search( { problem_id => $problem->id }, { order_by => [ 'created', 'id' ] } )
           ->all ];
 
     if (my $rotate_photo_param = $self->_get_rotate_photo_param($c)) {
@@ -905,7 +905,7 @@ sub report_edit : Path('report_edit') : Args(1) {
     if ( $c->get_param('resend') ) {
         $c->forward('/auth/check_csrf_token');
 
-        $problem->whensent(undef);
+        $problem->resend;
         $problem->update();
         $c->stash->{status_message} =
           '<p><em>' . _('That problem will now be resent.') . '</em></p>';
@@ -1009,6 +1009,7 @@ sub report_edit : Path('report_edit') : Args(1) {
 =head2 report_edit_category
 
 Handles changing a problem's category and the complexity that comes with it.
+Returns 1 if category changed, 0 if no change.
 
 =cut
 
@@ -1023,7 +1024,7 @@ sub report_edit_category : Private {
         # If the report has changed bodies (and not to a subset!) we need to resend it
         my %old_map = map { $_ => 1 } @{$problem->bodies_str_ids};
         if (grep !$old_map{$_}, @new_body_ids) {
-            $problem->whensent(undef);
+            $problem->resend;
         }
         # If the send methods of the old/new contacts differ we need to resend the report
         my @new_send_methods = uniq map {
@@ -1034,7 +1035,7 @@ sub report_edit_category : Private {
         } @contacts;
         my %old_send_methods = map { $_ => 1 } split /,/, ($problem->send_method_used || "Email");
         if (grep !$old_send_methods{$_}, @new_send_methods) {
-            $problem->whensent(undef);
+            $problem->resend;
         }
 
         $problem->bodies_str(join( ',', @new_body_ids ));
@@ -1053,7 +1054,9 @@ sub report_edit_category : Private {
                 anonymous => 0,
             });
         }
+        return 1;
     }
+    return 0;
 }
 
 =head2 report_edit_location
@@ -1062,7 +1065,8 @@ Handles changing a problem's location and the complexity that comes with it.
 For now, we reject the new location if the new location and old locations aren't
 covered by the same body.
 
-Returns 1 if the new position (if any) is acceptable, undef otherwise.
+Returns 2 if the new position (if any) is acceptable and changed,
+1 if acceptable and unchanged, undef otherwise.
 
 NB: This must be called before report_edit_category, as that might modify
 $problem->bodies_str.
@@ -1095,6 +1099,7 @@ sub report_edit_location : Private {
         $problem->longitude($c->stash->{longitude});
         my $areas = $c->stash->{all_areas_mapit};
         $problem->areas( ',' . join( ',', sort keys %$areas ) . ',' );
+        return 2;
     }
     return 1;
 }
@@ -1307,6 +1312,8 @@ sub users: Path('users') : Args(0) {
     } else {
         $c->forward('/auth/get_csrf_token');
         $c->forward('fetch_all_bodies');
+        $c->cobrand->call_hook('admin_user_edit_extra_data');
+
 
         # Admin users by default
         my $users = $c->cobrand->users->search(
@@ -1432,6 +1439,7 @@ sub user_add : Path('user_edit') : Args(0) {
     $c->stash->{template} = 'admin/user_edit.html';
     $c->forward('/auth/get_csrf_token');
     $c->forward('fetch_all_bodies');
+    $c->cobrand->call_hook('admin_user_edit_extra_data');
 
     return unless $c->get_param('submit');
 
@@ -1512,6 +1520,7 @@ sub user_edit : Path('user_edit') : Args(1) {
 
     $c->forward('fetch_all_bodies');
     $c->forward('fetch_body_areas', [ $user->from_body ]) if $user->from_body;
+    $c->cobrand->call_hook('admin_user_edit_extra_data');
 
     if ( defined $c->flash->{status_message} ) {
         $c->stash->{status_message} =

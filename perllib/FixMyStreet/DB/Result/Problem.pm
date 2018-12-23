@@ -177,11 +177,15 @@ __PACKAGE__->has_one(
   { cascade_copy => 0, cascade_delete => 0 },
 );
 
+# This will return the oldest moderation_original_data, if any.
+# The plural can be used to return all entries.
 __PACKAGE__->might_have(
   "moderation_original_data",
   "FixMyStreet::DB::Result::ModerationOriginalData",
   { "foreign.problem_id" => "self.id" },
   { where => { 'comment_id' => undef },
+    order_by => 'id',
+    rows => 1,
     cascade_copy => 0, cascade_delete => 1 },
 );
 
@@ -206,6 +210,7 @@ my $IM = eval {
 
 with 'FixMyStreet::Roles::Abuser',
      'FixMyStreet::Roles::Extra',
+     'FixMyStreet::Roles::Moderation',
      'FixMyStreet::Roles::Translatable',
      'FixMyStreet::Roles::PhotoSet';
 
@@ -893,7 +898,7 @@ bodies by some mechanism. Right now that mechanism is Open311.
 
 sub updates_sent_to_body {
     my $self = shift;
-    return unless $self->send_method_used && $self->send_method_used eq 'Open311';
+    return unless $self->send_method_used && $self->send_method_used =~ /Open311/;
 
     # Some bodies only send updates *to* FMS, they don't receive updates.
     my $cobrand = $self->get_cobrand_logged;
@@ -920,6 +925,12 @@ sub add_send_method {
     } else {
         $self->send_method_used($sender);
     }
+}
+
+sub resend {
+    my $self = shift;
+    $self->whensent(undef);
+    $self->send_method_used(undef);
 }
 
 sub as_hashref {
@@ -952,17 +963,6 @@ sub as_hashref {
     return $out;
 }
 
-=head2 latest_moderation_log_entry
-
-Return most recent ModerationLog object
-
-=cut
-
-sub latest_moderation_log_entry {
-    my $self = shift;
-    return $self->admin_log_entries->search({ action => 'moderation' }, { order_by => { -desc => 'id' } })->first;
-}
-
 __PACKAGE__->has_many(
   "admin_log_entries",
   "FixMyStreet::DB::Result::AdminLog",
@@ -972,6 +972,11 @@ __PACKAGE__->has_many(
       where => { 'object_type' => 'problem' },
   }
 );
+
+sub moderation_filter {
+    my $self = shift;
+    { comment_id => undef };
+}
 
 sub get_time_spent {
     my $self = shift;

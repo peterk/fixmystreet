@@ -188,6 +188,9 @@ $.extend(fixmystreet.utils, {
         var selected_size = fixmystreet.maps.selected_marker_size();
         for (var i=0; i<pins.length; i++) {
             var pin = pins[i];
+            if (pin[1] == 0 && pin[0] == 0) {
+                continue;
+            }
             var loc = new OpenLayers.Geometry.Point(pin[1], pin[0]);
             if (transform) {
                 // The Strategy does this for us, so don't do it in that case.
@@ -340,6 +343,22 @@ $.extend(fixmystreet.utils, {
                   $('#loading-indicator').attr('aria-hidden', true);
               }
           }
+      },
+
+      get_map_state: function() {
+          var centre = fixmystreet.map.getCenter();
+          return {
+              zoom: fixmystreet.map.getZoom(),
+              lat: centre.lat,
+              lon: centre.lon,
+          };
+      },
+
+      set_map_state: function(state) {
+          fixmystreet.map.setCenter(
+              new OpenLayers.LonLat( state.lon, state.lat ),
+              state.zoom
+          );
       }
     });
 
@@ -499,8 +518,8 @@ $.extend(fixmystreet.utils, {
             $("#problem_easting").text(bng.x.toFixed(1));
             $("#problem_latitude").text(lonlat.y.toFixed(6));
             $("#problem_longitude").text(lonlat.x.toFixed(6));
-            $("form#report_inspect_form input[name=latitude]").val(lonlat.y);
-            $("form#report_inspect_form input[name=longitude]").val(lonlat.x);
+            $("input[name=latitude]").val(lonlat.y.toFixed(6));
+            $("input[name=longitude]").val(lonlat.x.toFixed(6));
         },
         false);
     }
@@ -839,17 +858,20 @@ $.extend(fixmystreet.utils, {
             $(fixmystreet).trigger('maps:update_view');
         });
 
-        (function() {
-            var timeout;
-            $('#js-reports-list').on('mouseenter', '.item-list--reports__item', function(){
-                var href = $('a', this).attr('href');
-                var id = parseInt(href.replace(/^.*[\/]([0-9]+)$/, '$1'),10);
-                clearTimeout(timeout);
-                fixmystreet.maps.markers_highlight(id);
-            }).on('mouseleave', '.item-list--reports__item', function(){
-                timeout = setTimeout(fixmystreet.maps.markers_highlight, 50);
-            });
-        })();
+        if (!fixmystreet.map.events.extensions.buttonclick.isDeviceTouchCapable) {
+            // On touchscreens go straight to the report (see #2294).
+            (function() {
+                var timeout;
+                $('#js-reports-list').on('mouseenter', '.item-list--reports__item', function(){
+                    var href = $('a', this).attr('href');
+                    var id = parseInt(href.replace(/^.*[\/]([0-9]+)$/, '$1'),10);
+                    clearTimeout(timeout);
+                    fixmystreet.maps.markers_highlight(id);
+                }).on('mouseleave', '.item-list--reports__item', function(){
+                    timeout = setTimeout(fixmystreet.maps.markers_highlight, 50);
+                });
+            })();
+        }
     });
 
 // End maps closure

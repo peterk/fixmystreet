@@ -85,11 +85,34 @@ sub display :PathPart('') :Chained('id') :Args(0) {
     $c->forward( 'format_problem_for_display' );
 
     my $permissions = $c->stash->{_permissions} ||= $c->forward( 'check_has_permission_to',
-        [ qw/report_inspect report_edit_category report_edit_priority/ ] );
+        [ qw/report_inspect report_edit_category report_edit_priority report_mark_private/ ] );
     if (any { $_ } values %$permissions) {
         $c->stash->{template} = 'report/inspect.html';
         $c->forward('inspect');
     }
+}
+
+sub moderate_report :PathPart('moderate') :Chained('id') :Args(0) {
+    my ( $self, $c ) = @_;
+
+    if ($c->user_exists && $c->user->can_moderate($c->stash->{problem})) {
+        $c->stash->{show_moderation} = 'report';
+        $c->stash->{template} = 'report/display.html';
+        $c->detach('display');
+    }
+    $c->res->redirect($c->stash->{problem}->url);
+}
+
+sub moderate_update :PathPart('moderate') :Chained('id') :Args(1) {
+    my ( $self, $c, $update_id ) = @_;
+
+    my $comment = $c->stash->{problem}->comments->find($update_id);
+    if ($c->user_exists && $comment && $c->user->can_moderate($comment)) {
+        $c->stash->{show_moderation} = $update_id;
+        $c->stash->{template} = 'report/display.html';
+        $c->detach('display');
+    }
+    $c->res->redirect($c->stash->{problem}->url);
 }
 
 sub support :Chained('id') :Args(0) {
@@ -131,8 +154,8 @@ sub load_problem_or_display_error : Private {
         # Creator, and inspection users can see non_public reports
         $c->stash->{problem} = $problem;
         my $permissions = $c->stash->{_permissions} = $c->forward( 'check_has_permission_to',
-            [ qw/report_inspect report_edit_category report_edit_priority/ ] );
-        if ( !$c->user || ($c->user->id != $problem->user->id && !$permissions->{report_inspect}) ) {
+            [ qw/report_inspect report_edit_category report_edit_priority report_mark_private / ] );
+        if ( !$c->user || ($c->user->id != $problem->user->id && !($permissions->{report_inspect} || $permissions->{report_mark_private})) ) {
             $c->detach(
                 '/page_error_403_access_denied',
                 [ sprintf(_('That report cannot be viewed on %s.'), $c->stash->{site_name}) ]
@@ -163,14 +186,30 @@ sub load_updates : Private {
         { order_by => [ 'confirmed', 'id' ] }
     );
 
-    my $questionnaires = $c->model('DB::Questionnaire')->search(
+    my $questionnaires_still_open = $c->model('DB::Questionnaire')->search(
         {
             problem_id => $c->stash->{problem}->id,
             whenanswered => { '!=', undef },
-            old_state => [ -and =>
-                { -in => [ FixMyStreet::DB::Result::Problem::closed_states, FixMyStreet::DB::Result::Problem::open_states ] },
-                \'= new_state',
-            ]
+            -or => [ {
+                # Any steady state open/closed
+                old_state => [ -and =>
+                    { -in => [ FixMyStreet::DB::Result::Problem::closed_states, FixMyStreet::DB::Result::Problem::open_states ] },
+                    \'= new_state',
+                ],
+            }, {
+                # Any reopening
+                new_state => 'confirmed',
+            } ]
+        },
+        { order_by => 'whenanswered' }
+    );
+
+    my $questionnaires_fixed = $c->model('DB::Questionnaire')->search(
+        {
+            problem_id => $c->stash->{problem}->id,
+            whenanswered => { '!=', undef },
+            old_state => { -not_in => [ FixMyStreet::DB::Result::Problem::fixed_states ] },
+            new_state => { -in => [ FixMyStreet::DB::Result::Problem::fixed_states ] },
         },
         { order_by => 'whenanswered' }
     );
@@ -183,11 +222,15 @@ sub load_updates : Private {
             $questionnaires_with_updates{$qid} = $update;
         }
     }
-    while (my $q = $questionnaires->next) {
+    while (my $q = $questionnaires_still_open->next) {
         if (my $update = $questionnaires_with_updates{$q->id}) {
             $update->set_extra_metadata('open_from_questionnaire', 1);
             next;
         }
+        push @combined, [ $q->whenanswered, $q ];
+    }
+    while (my $q = $questionnaires_fixed->next) {
+        next if $questionnaires_with_updates{$q->id};
         push @combined, [ $q->whenanswered, $q ];
     }
     @combined = map { $_->[1] } sort { $a->[0] <=> $b->[0] } @combined;
@@ -456,6 +499,8 @@ sub inspect : Private {
                 $problem->defect_type(undef);
             }
         }
+
+        $c->cobrand->call_hook(report_inspect_update_extra => $problem);
 
         if ($valid) {
             if ( $reputation_change != 0 ) {

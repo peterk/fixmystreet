@@ -4,10 +4,14 @@ use parent 'FixMyStreet::Cobrand::UKCouncils';
 use strict;
 use warnings;
 
+use Moo;
+with 'FixMyStreet::Roles::ConfirmValidation';
+
 sub council_area_id { return 2217; }
 sub council_area { return 'Buckinghamshire'; }
 sub council_name { return 'Buckinghamshire County Council'; }
 sub council_url { return 'buckinghamshire'; }
+
 
 sub example_places {
     return ( 'HP19 7QF', "Walton Road" );
@@ -354,5 +358,24 @@ sub lookup_site_code_config { {
     }
 } }
 
+sub extra_contact_validation {
+    my $self = shift;
+    my $c = shift;
+
+    # Don't care about dest unless reporting abuse
+    return () unless $c->stash->{problem};
+
+    my %errors;
+
+    $c->stash->{dest} = $c->get_param('dest');
+
+    if (!$c->get_param('dest')) {
+        $errors{dest} = "Please enter a topic of your message";
+    } elsif ( $c->get_param('dest') eq 'council' || $c->get_param('dest') eq 'update' ) {
+        $errors{not_for_us} = 1;
+    }
+
+    return %errors;
+}
 
 1;

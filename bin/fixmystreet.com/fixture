@@ -38,7 +38,28 @@ print($usage->text), exit if $opt->help;
 FixMyStreet::DB::Factories->setup($opt);
 
 # Body + categories
-my $categories = ['Potholes', 'Street lighting', 'Graffiti', 'Other'];
+my $categories = [
+    'Abandoned vehicles',
+    'Bus stops',
+    'Dog fouling',
+    'Flyposting',
+    'Flytipping',
+    'Footpath/bridleway away from road',
+    'Graffiti',
+    'Parks/landscapes',
+    'Pavements',
+    'Potholes',
+    'Public toilets',
+    'Roads/highways',
+    'Road traffic signs',
+    'Rubbish (refuse and recycling)',
+    'Street cleaning',
+    'Street lighting',
+    'Street nameplates',
+    'Traffic lights',
+    'Trees',
+    'Other',
+];
 my $body = FixMyStreet::DB::Factory::Body->find_or_create({
     area_id => $opt->area_id,
     categories => $categories,
@@ -84,9 +105,15 @@ my $perms_cs = [
     'contribute_as_body', 'contribute_as_another_user',
     'moderate', 'view_body_contribute_details',
 ];
+my $perms_cs_full = [
+    'contribute_as_body', 'contribute_as_another_user',
+    'moderate', 'view_body_contribute_details',
+    'report_prefill', 'default_to_body'
+];
 foreach (
     { name => 'Inspector Gadget', email => 'inspector@example.org', email_verified => 1, body => $body, permissions => $perms_inspector },
     { name => 'Harriet Helpful', email_verified => 1, email => 'cs@example.org', body => $body, permissions => $perms_cs },
+    { name => 'Andrew Agreeable', email_verified => 1, email => 'cs_full@example.org', body => $body, permissions => $perms_cs_full },
     { name => 'Super User', email_verified => 1, email => 'super@example.org', body => $body, permissions => [
         @$perms_cs, @$perms_inspector, 'report_edit',
         'category_edit', 'template_edit', 'responsepriority_edit',
@@ -125,7 +152,7 @@ foreach (FixMyStreet::Cobrand->available_cobrand_classes) {
 FixMyStreet::PhotoStorage::backend->init();
 
 my $user = $users{'user@example.org'};
-my $num = $opt->nonrandom ? 21 : 20;
+my $num = $opt->nonrandom ? 21 : 50;
 say "Created $num problems around '$location' in cobrand '$cobrand'";
 my $confirmed = DateTime->today->subtract(days => 1)->add(hours => 8);
 
@@ -176,7 +203,7 @@ for (0..$num-1) {
     });
 }
 
-for (1..3) {
+for (1..5) {
     my $p = $problems->[int(rand(@$problems))];
     $users{'inspector@example.org'}->add_to_planned_reports($p);
 }
@@ -195,7 +222,7 @@ my @fixed_user = (
 
 my @problems = $opt->nonrandom ? @$problems : shuffle(@$problems);
 
-my @range = $opt->nonrandom ? (1, 7, 12) : (1..3);
+my @range = $opt->nonrandom ? (1, 7, 12) : (1..10);
 for (@range) {
     my $problem = $problems[$_];
     $confirmed->add(seconds => rand(10000));
@@ -253,11 +280,11 @@ my @open_user = (
     'Ongoing issue.',
     'Council rang to say they’re aware and it’s on their list.',
     'Still awaiting news on this one.',
-    'Council let me know it’s not a top priority, which TBH I  do understand now they’ve talked it through.',
+    'Council let me know it’s not a top priority, which TBH I do understand now they’ve talked it through.',
 );
 
 my $updates = [];
-@range = $opt->nonrandom ? (13, 8, 2) : (5..9);
+@range = $opt->nonrandom ? (13, 8, 2) : (11..20);
 for my $i (@range) {
     $confirmed->add(seconds => rand(10000));
     my @range_u = $opt->nonrandom ? (1..$i) : (1);
@@ -271,7 +298,7 @@ for my $i (@range) {
 }
 
 # Some not responsible updates
-@range = $opt->nonrandom ? (3, 9, 20) : (11..13);
+@range = $opt->nonrandom ? (3, 9, 20) : (21..25);
 for (@range) {
     my $problem = $problems[$_];
     $confirmed->add(seconds => rand(10000));

@@ -20,6 +20,8 @@ OpenLayers.Layer.VectorAsset = OpenLayers.Class(OpenLayers.Layer.Vector, {
     initialize: function(name, options) {
         OpenLayers.Layer.Vector.prototype.initialize.apply(this, arguments);
         // Update layer based upon new data from category change
+        $(fixmystreet).on('assets:selected', this.checkSelected.bind(this));
+        $(fixmystreet).on('assets:unselected', this.checkSelected.bind(this));
         $(fixmystreet).on('report_new:category_change', this.update_layer_visibility.bind(this));
     },
 
@@ -95,6 +97,31 @@ OpenLayers.Layer.VectorAsset = OpenLayers.Class(OpenLayers.Layer.Vector, {
         }
     },
 
+    checkSelected: function(evt, lonlat) {
+        if (!this.getVisibility()) {
+          return;
+        }
+        if (this.fixmystreet.select_action) {
+            if (fixmystreet.assets.selectedFeature()) {
+                this.asset_found();
+            } else {
+                this.asset_not_found();
+            }
+        }
+    },
+
+    asset_found: function() {
+        if (this.fixmystreet.actions) {
+            this.fixmystreet.actions.asset_found(fixmystreet.assets.selectedFeature(), this.fixmystreet);
+        }
+    },
+
+    asset_not_found: function() {
+        if (this.fixmystreet.actions) {
+            this.fixmystreet.actions.asset_not_found(this.fixmystreet);
+        }
+    },
+
     CLASS_NAME: 'OpenLayers.Layer.VectorAsset'
 });
 
@@ -131,7 +158,7 @@ OpenLayers.Layer.VectorNearest = OpenLayers.Class(OpenLayers.Layer.VectorAsset, 
         var feature = this.getFeatureAtPoint(point);
         if (feature == null) {
             // The click wasn't directly over a road, try and find one nearby
-            feature = this.getNearestFeature(point, 10);
+            feature = this.getNearestFeature(point, this.fixmystreet.nearest_radius || 10);
         }
         this.selected_feature = feature;
     },
@@ -288,6 +315,7 @@ function asset_unselected(e) {
     if (this.fixmystreet.attributes) {
         clear_fields_for_attributes(this.fixmystreet.attributes);
     }
+    $(fixmystreet).trigger('assets:unselected');
 }
 
 function set_fields_from_attributes(attributes, feature) {
@@ -807,6 +835,9 @@ return {
     allow_send: function(body) {
         do_not_send = $.grep(do_not_send, function(a) { return a !== body; });
         update();
+    },
+    get_only_send: function() {
+      return only_send;
     }
 };
 

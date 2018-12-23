@@ -166,6 +166,11 @@ citizen’s experience](/pro-manual/citizens-experience/)'. Those with the appro
 the report-making interface, labeled ‘Report As’. Select ‘the council’, ‘yourself’, ‘anonymous’ or
 ‘another user’.
 
+If a user has the ‘Default to creating reports/update as the council’
+permission then the dropdown will default to reporting as the council.
+Staff with the ’Markup problem details’ permission will also default to
+reporting as the council.
+
 </div>
 
 
@@ -247,6 +252,29 @@ button.
 When a user has been banned, an ‘unban’ button will be visible on their records and reports. This
 restores them to the status of a standard user, but it does not have any effect on reports which
 were made during the period when the user was banned — these remain unsent.
+
+</div>
+
+<div class="admin-task" markdown="1" id="create-reports-private">
+
+### Creating/Viewing private reports
+
+<span class="admin-task__permissions">Permissions required: User must be marked
+as staff; one or more of ‘View/Mark private reports’ and ‘Markup problem
+details’ must be ticked.</span>
+
+If a you are creating a report that has to contain information that should
+not be make public, e.g. Names and addresses, then you can create a
+Private report. This will still be visible to staff members with the
+relevant permissions and will be sent as normal but will not be visible
+to members of the public.
+
+You can also mark an existing report as private by visiting the report
+page while logged in, checking "Private" and clicking "Save Changes".
+
+In such cases, staff should make a new report just as a member of the public would — see ‘[The
+citizen’s experience](/pro-manual/citizens-experience/)'. Those with the appropriate permissions
+will see a "Private" checkbox underneath the user details which they should select.
 
 </div>
 

@@ -376,9 +376,10 @@ $.extend(fixmystreet.set_up, {
       function add_handlers (elem, word) {
           elem.each( function () {
               var $elem = $(this);
-              $elem.find('.js-moderate').on('click', function () {
-                  $elem.find('.moderate-display').hide();
-                  $elem.find('.moderate-edit').show();
+              $elem.find('.js-moderate').on('click', function(e) {
+                  e.preventDefault();
+                  $elem.toggleClass('show-moderation');
+                  $('#map_sidebar').scrollTop(word === 'problem' ? 0 : $elem[0].offsetTop);
               });
 
               $elem.find('.revert-title').change( function () {
@@ -398,8 +399,8 @@ $.extend(fixmystreet.set_up, {
               });
 
               $elem.find('.cancel').click( function () {
-                  $elem.find('.moderate-display').show();
-                  $elem.find('.moderate-edit').hide();
+                  $elem.toggleClass('show-moderation');
+                  $('#map_sidebar').scrollTop(word === 'problem' ? 0 : $elem[0].offsetTop);
               });
 
               $elem.find('form').submit( function () {
@@ -453,10 +454,9 @@ $.extend(fixmystreet.set_up, {
 $(fixmystreet).on('report_new:category_change', function(evt, $this) {
     var category = $this.val();
     var prefill_reports = $this.data('prefill');
-    var role = $this.data('role');
     var body = $this.data('body');
 
-    if (prefill_reports && role == 'inspector') {
+    if (prefill_reports) {
         var title = 'A ' + category + ' problem has been found';
         var description = 'A ' + category + ' problem has been found by ' + body;
 

@@ -8,6 +8,8 @@ $menu-image: 'menu-white' !default;
 $itemlist_item_background: #f6f6f6 !default;
 $itemlist_item_background_hover: #e6e6e6 !default;
 $col_big_numbers: #ccc !default;
+$col_fixed_label: #00BD08 !default;
+$col_fixed_label_light: mix($col_fixed_label, #fff, 10%) !default;
 
 $form-control-border-color: #aaaaaa !default;
 $header-top-border-width: 0.25em !default;
@@ -48,7 +50,17 @@ h1 {
   font-weight: normal;
   margin-top: 0.5em;
   margin-bottom: 0.5em;
+
+  // Useful for extra inline text after a heading
+  small {
+    display: inline-block; // break onto its own line if not enough horizontal space
+    font-style: inherit;
+    font-family: inherit;
+    font-size: 0.5em; // back down to 1em from the 2em parent
+    line-height: 1em;
+  }
 }
+
 h1#reports_heading {
   margin-bottom: 0;
 }
@@ -172,7 +184,8 @@ select {
   width: 100%;
 }
 
-a {
+a,
+.fake-link {
   text-decoration: none;
   color: #0BA7D1;
 
@@ -185,6 +198,16 @@ a {
     text-decoration: underline;
     color: #0D7CCE;
   }
+}
+
+.fake-link {
+  display: inline-block;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 1em;
+  padding: 0;
+  margin: 0;
 }
 
 // custom type
@@ -338,6 +361,27 @@ select.form-control {
     line-height: 1em * (22/16);
 }
 
+.form-section-preview {
+    // If social_auth_enabled, but no javascript, we want the "Next" preview
+    // to be visible but without any other styling. Once javascript is enabled,
+    // the "next"/"back" buttons will work, so we want the styling back.
+    html.js & {
+        background-color: #eee;
+        border-radius: 4px;
+        padding: 1em;
+
+        .form-section-heading {
+          margin: 0 0 0.5em 0;
+        }
+    }
+}
+
+// Purposefully *not* wrapped in `html.js` because the margin-top helps
+// separate the social login buttons from the .description_tips list.
+.form-section-preview--next {
+    margin-top: 1.5em;
+}
+
 // grey background, full width box
 .form-box {
   margin: 0 -1em 0.25em;
@@ -372,12 +416,6 @@ select.form-control {
       margin-#{$right}: 0.25em;
     }
   }
-}
-
-// When the user is logged in, we show a shorter form-box,
-// without a heading before it. So add some space before.
-#form-box--logged-in-name {
-  margin-top: 1.25em;
 }
 
 .change_location {
@@ -470,6 +508,12 @@ input.form-error,
 textarea.form-error {
   border-color:#ff0000;
   @include border-radius(0 0.25em 0.25em 0.25em);
+}
+
+.form-error__box {
+    border: solid 2px #ff0000;
+    padding: 0.5em;
+    margin-bottom: 0.5em;
 }
 
 ul.error {
@@ -734,7 +778,16 @@ footer {
 /*BUTTONS*/
 
 .btn {
-  @include button-reset;
+  @include button-reset();
+}
+
+// Deprecated
+// Try to use `btn btn--primary` etc instead of `btn-primary` where possible.
+.btn-primary,
+.green-btn,
+.btn-danger,
+.red-btn {
+  @include button-size();
 }
 
 .btn + .btn {
@@ -743,13 +796,15 @@ footer {
 }
 
 .btn-primary,
-.green-btn {
-  @include button-reset(#9FDE23, #7FB900, #5B9700, #fff, #9FDE23, #7FB900, #5B9700, #fff);
+.green-btn,
+.btn--primary {
+  @include button-variant(#9FDE23, #7FB900, #5B9700, #fff, #9FDE23, #7FB900, #5B9700, #fff);
 }
 
 .btn-danger,
-.red-btn {
-  @include button-reset(#FF0038, #BF002A, #80001C, #fff, #FF0038, #BF002A, #80001C, #fff);
+.red-btn,
+.btn--danger {
+  @include button-variant(#FF0038, #BF002A, #80001C, #fff, #FF0038, #BF002A, #80001C, #fff);
 }
 
 .final-submit,
@@ -759,7 +814,7 @@ input.final-submit {
 }
 
 .btn--facebook {
-    @include button-reset(#3b5998, darken(#3b5998, 10%), #3b5998, #fff, darken(#3b5998, 5%), darken(#3b5998, 10%), #3b5998, #fff);
+    @include button-variant(#3b5998, darken(#3b5998, 10%), #3b5998, #fff, darken(#3b5998, 5%), darken(#3b5998, 10%), #3b5998, #fff);
 
     img {
         margin-#{$right}: 0.5em;
@@ -770,7 +825,7 @@ input.final-submit {
 }
 
 .btn--twitter {
-    @include button-reset(#55acee, darken(#55acee, 10%), #55acee, #fff, darken(#55acee, 5%), darken(#55acee, 10%), #55acee, #fff);
+    @include button-variant(#55acee, darken(#55acee, 10%), #55acee, #fff, darken(#55acee, 5%), darken(#55acee, 10%), #55acee, #fff);
 
     img {
         margin-#{$right}: 0.5em;
@@ -850,60 +905,29 @@ input.final-submit {
 
 .btn--block {
     display: block;
-    text-align: center;
+    // Need to force 100% width if this is applied to <button> or <input> elements
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    @include box-sizing(border-box);
 }
 
-// Under the button to override its text transform and width
-.btn--social {
-    text-transform: none;
-    text-align: center;
+// Don't want space between block-level buttons,
+// because they don't sit beside each other anyway.
+.btn--block + .btn--block {
+    margin-#{$left}: 0;
+    margin-top: 1em;
 }
 
 .btn--small {
   font-size: 0.8em;
 }
 
-.js #js-social-email-hide {
-    display: none;
-}
-
-.banner {
-  position: relative;
-  p {
-    position: absolute;
-    top:-1.95em;
-    #{$right}: 0;
-    @include inline-block;
-    font-size:0.6875em;//11px
-    line-height:1em;
-    padding:0.5em 1em;
-    margin:0;
-    color:#1a1a1a;
-    background: #ccc;
-    text: {
-      transform:uppercase;
-      align:center;
-    }
-    &:before {
-      content: "";
-      #{$left}: -0.5em;
-      top:0;
-      position: absolute;
-      width: 0;
-      height: 0;
-      border-#{$left}: 0.5em solid transparent;
-      border-bottom: 0.5em solid #888;
-    }
-  }
-
-  #fixed {
-    color:#fff;
-    background: $col_fixed_label;
-
-    &:before {
-      border-bottom: 0.5em solid $col_fixed_label_dark;
-    }
-  }
+// Most of our forms get their vertical spacing from the margin-top on labels.
+// This means the final submit button can end up uncomfortably close to the
+// bottom of the final input. Add a class of `btn--final` to fix this.
+.btn--final {
+    margin-top: 1.25em; // matches margin-top on `label`
 }
 
 /*OTHER*/
@@ -1294,9 +1318,9 @@ input.final-submit {
   display: block;
   font-size: 1em;
   line-height: 1.2em;
-  margin-bottom: 1em;
-  padding-bottom: 0.8em;
-  border-bottom: 1px solid #eee;
+  margin: -1em -1em 1em -1em;
+  padding: 0.9em 1em;
+  border-bottom: 0.2em solid #eee;
 
   &:link, &:visited, &:hover {
     color: #666;
@@ -1314,6 +1338,36 @@ input.final-submit {
     @include svg-background-image('/cobrands/fixmystreet/images/report-tools');
     background-position: flip(0 0, -16px 0);
   }
+}
+
+// Banner showing report status, above report title on individual report page.
+.banner {
+  line-height: 1.2; // down from 1.5 default on `body`
+  margin: -1.2em -1em 1em -1em;
+  padding: 0.9em 1em;
+  background-color: #f6f6f6;
+  border-top: 0.2em solid #999;
+
+  p {
+    font-weight: bold;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  .pin {
+    width: 16px;
+    height: 20px;
+    margin: -10px 0;
+    margin-#{$right}: 0.3em;
+    vertical-align: 0.4em;
+  }
+}
+
+.banner--fixed {
+  border-top-color: $col_fixed_label;
+  background-color: $col_fixed_label_light;
 }
 
 .problem-header {
@@ -1347,6 +1401,15 @@ input.final-submit {
 
   h1 input {
     border-width: (0.125em/2); // compensate for 2em font-size on h1s
+  }
+}
+
+.show-moderation {
+  .moderate-edit {
+    display: block;
+  }
+  .moderate-display {
+    display: none;
   }
 }
 
@@ -2413,6 +2476,14 @@ a#geolocate_link.loading, .btn--geolocate.loading {
 
         &:last-child {
             margin-bottom: 0;
+        }
+    }
+
+    .segmented-control {
+        .btn {
+            &:last-child {
+                margin-bottom: 1em;
+            }
         }
     }
 }
