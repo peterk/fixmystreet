@@ -14,6 +14,9 @@ my $user = $mech->create_user_ok('system_user@example.com', name => 'test users'
 my $body = $mech->create_body_ok(2482, 'Bromley');
 my $contact = $mech->create_contact_ok( body_id => $body->id, category => 'Sidewalk and Curb Issues', email => 'sidewalks' );
 
+my $body2 = $mech->create_body_ok(2217, 'Buckinghamshire');
+my $contact2 = $mech->create_contact_ok( body_id => $body2->id, category => 'Sidewalk and Curb Issues', email => 'sidewalks' );
+
 my $dtf = DateTime::Format::W3CDTF->new;
 
 my $requests_xml = qq{<?xml version="1.0" encoding="utf-8"?>
@@ -404,6 +407,118 @@ subtest "check options passed through from body" => sub {
 
     ok $props->{convert_latlong}, "convert latlong set"
 };
+
+my $non_public_xml = qq[<?xml version="1.0" encoding="utf-8"?>
+<service_requests>
+<request>
+<service_request_id>123456</service_request_id>
+<status>open</status>
+<status_notes></status_notes>
+<service_name>Sidewalk and Curb Issues</service_name>
+<service_code>sidewalks</service_code>
+<description>this is a problem</description>
+<agency_responsible></agency_responsible>
+<service_notice></service_notice>
+<requested_datetime>2010-04-14T06:37:38-08:00</requested_datetime>
+<updated_datetime>2010-04-14T06:37:38-08:00</updated_datetime>
+<expected_datetime>2010-04-15T06:37:38-08:00</expected_datetime>
+<lat>51.4021</lat>
+<long>0.01578</long>
+<non_public>1</non_public>
+</request>
+</service_requests>
+];
+
+for my $test (
+  {
+      desc => 'non public is set',
+      non_public => 1,
+  },
+  {
+      desc => 'non public is not set',
+      non_public => 0,
+  },
+) {
+    subtest $test->{desc} => sub {
+        (my $xml = $non_public_xml) =~ s/non_public>1/non_public>$test->{non_public}/;
+
+        my $o = Open311->new(
+            jurisdiction => 'mysociety',
+            endpoint => 'http://example.com',
+            test_mode => 1,
+            test_get_returns => { 'requests.xml' => $xml}
+        );
+
+        my $update = Open311::GetServiceRequests->new(
+            system_user => $user,
+            start_date => $start_date,
+            end_date => $end_date
+        );
+
+        FixMyStreet::override_config {
+            MAPIT_URL => 'http://mapit.uk/',
+        }, sub {
+            $update->create_problems( $o, $body );
+        };
+
+        my $p = FixMyStreet::DB->resultset('Problem')->search(
+            { external_id => 123456 }
+        )->first;
+
+        ok $p, 'problem created';
+        is $p->non_public, $test->{non_public}, "report non_public is set correctly";
+
+        $p->delete;
+    };
+}
+
+for my $test (
+  {
+      test_desc => 'filters out phone numbers',
+      desc => 'This has a description with values:0117 469 0123 and more 07700 900123',
+  },
+  {
+      test_desc => 'filters out emails',
+      desc => 'This has a description with values:test@example.org and more user@council.gov.uk',
+  },
+) {
+    subtest $test->{test_desc} => sub {
+        my $xml = prepare_xml({
+            desc => $test->{desc},
+            lat => 51.615559,
+            long => -0.556903,
+        });
+
+        my $o = Open311->new(
+            jurisdiction => 'mysociety',
+            endpoint => 'http://example.com',
+            test_mode => 1,
+            test_get_returns => { 'requests.xml' => $xml}
+        );
+
+        my $update = Open311::GetServiceRequests->new(
+            system_user => $user,
+            start_date => $start_date,
+            end_date => $end_date
+        );
+
+        FixMyStreet::override_config {
+            ALLOWED_COBRANDS => [ 'FixMyStreet', 'Buckinghamshire' ],
+            MAPIT_URL => 'http://mapit.uk/',
+        }, sub {
+            $update->create_problems( $o, $body2 );
+        };
+
+        my $p = FixMyStreet::DB->resultset('Problem')->search(
+            { external_id => 123456 }
+        )->first;
+
+        ok $p, 'problem created';
+        is $p->detail, 'This has a description with values: and more ', "report description filtered";
+
+        $p->delete;
+    };
+}
 
 sub prepare_xml {
     my $replacements = shift;

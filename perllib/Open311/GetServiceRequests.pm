@@ -154,11 +154,17 @@ sub create_problems {
             next;
         }
 
+        if ( my $cobrand = $body->get_cobrand_handler ) {
+            my $filtered = $cobrand->call_hook('filter_report_description', $request->{description});
+            $request->{description} = $filtered if defined $filtered;
+        }
 
         my @contacts = grep { $request->{service_code} eq $_->email } $contacts->all;
         my $contact = $contacts[0] ? $contacts[0]->category : 'Other';
 
         my $state = $open311->map_state($request->{status});
+
+        my $non_public = $request->{non_public} ? 1 : 0;
 
         my $problem = $self->schema->resultset('Problem')->new(
             {
@@ -182,6 +188,7 @@ sub create_problems {
                 send_method_used => 'Open311',
                 category => $contact,
                 send_questionnaire => 0,
+                non_public => $non_public,
             }
         );
 

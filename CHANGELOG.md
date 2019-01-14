@@ -12,6 +12,7 @@
         - Allow moderation to work without JavaScript. #2339
         - More prominent display of "state" on report page #2350
         - Improved report/update display on contact form. #2351
+        - Can limit /reports to non-public reports. #2363
     - Admin improvements:
         - Allow moderation to potentially change category. #2320
         - Add Mark/View private reports permission #2306
@@ -26,6 +27,7 @@
     - Open311 improvements:
         - Fix bug in contact group handling. #2323
         - Improve validation of fetched reports timestamps. #2327
+        - Fetched reports can be marked non_public #2356
     - Development improvements:
         - Add option to symlink full size photos. #2326
         - default_to_body/report_prefill permissions to control default
