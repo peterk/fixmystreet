@@ -37,6 +37,20 @@ DB tables:
 
 =cut
 
+sub end : ActionClass('RenderView') {
+    my ($self, $c) = @_;
+
+    if ($c->stash->{moderate_errors}) {
+        $c->stash->{show_moderation} = 'report';
+        $c->stash->{template} = 'report/display.html';
+        $c->forward('/report/display');
+    } elsif ($c->res->redirect) {
+        # Do nothing if we're already going somewhere
+    } else {
+        $c->res->redirect($c->stash->{report_uri});
+    }
+}
+
 sub moderate : Chained('/') : PathPart('moderate') : CaptureArgs(0) { }
 
 sub report : Chained('moderate') : PathPart('report') : CaptureArgs(1) {
@@ -48,9 +62,7 @@ sub report : Chained('moderate') : PathPart('report') : CaptureArgs(1) {
     my $report_uri = $cobrand_base . $problem->url;
     $c->stash->{cobrand_base} = $cobrand_base;
     $c->stash->{report_uri} = $report_uri;
-    $c->res->redirect( $report_uri ); # this will be the final endpoint after all processing...
 
-    # ... and immediately, if the user isn't logged in
     $c->detach unless $c->user_exists;
 
     $c->forward('/auth/check_csrf_token');
@@ -78,9 +90,11 @@ sub moderate_report : Chained('report') : PathPart('') : Args(0) {
     # Make sure user can moderate this report
     $c->detach unless $c->user->can_moderate($problem);
 
+    $c->forward('check_edited_elsewhere');
     $c->forward('report_moderate_hide');
 
     my @types = grep $_,
+        $c->forward('moderate_state'),
         ($c->user->can_moderate_title($problem, 1)
             ? $c->forward('moderate_text', [ 'title' ])
             : ()),
@@ -99,19 +113,37 @@ sub moderate_report : Chained('report') : PathPart('') : Args(0) {
     if ($photo_edit_form) {
         $c->forward('/photo/process_photo');
         if ( my $photo_error = delete $c->stash->{photo_error} ) {
-            $c->flash->{moderate_errors} ||= [];
-            push @{ $c->flash->{moderate_errors} }, $photo_error;
+            $c->stash->{moderate_errors} ||= [];
+            push @{ $c->stash->{moderate_errors} }, $photo_error;
         } else {
             my $fileid = $c->stash->{upload_fileid};
             if ($fileid ne $problem->photo) {
                 $problem->get_photoset->delete_cached;
-                $problem->update({ photo => $fileid || undef });
+                $problem->photo($fileid || undef);
                 push @types, 'photo';
             }
         }
     }
 
-    $c->detach( 'report_moderate_audit', \@types )
+    $c->detach( 'report_moderate_audit', \@types );
+}
+
+sub check_edited_elsewhere : Private {
+    my ($self, $c) = @_;
+
+    my $problem = $c->stash->{problem};
+    my $last_moderation = $problem->latest_moderation;
+    return unless $last_moderation;
+
+    my $form_started = $c->get_param('form_started') || 0;
+    if ($form_started && $form_started < $last_moderation->created->epoch) {
+        $c->stash->{moderate_errors} ||= [];
+        push @{$c->stash->{moderate_errors}},
+            _('Someone has moderated this report since you started.') . ' ' .
+            sprintf(_('Please <a href="#%s">check their changes</a> and resolve any differences.'),
+            'update_m' . $last_moderation->id);
+        $c->detach;
+    }
 }
 
 sub moderating_user_name {
@@ -128,6 +160,9 @@ sub moderate_log_entry : Private {
 
     my $types_csv = join ', ' => @types;
 
+    my $log_reason = "($types_csv)";
+    $log_reason = "$reason $log_reason" if $reason;
+
     # We attach the log to the moderation entry if present, or the object if not (hiding)
     $c->model('DB::AdminLog')->create({
         action => 'moderation',
@@ -135,7 +170,7 @@ sub moderate_log_entry : Private {
         admin_user => moderating_user_name($user),
         object_id => $c->stash->{history}->id || $object->id,
         object_type => $c->stash->{history}->id ? 'moderation' : $object_type,
-        reason => (sprintf '%s (%s)', $reason, $types_csv),
+        reason => $log_reason,
     });
 }
 
@@ -143,6 +178,17 @@ sub report_moderate_audit : Private {
     my ($self, $c, @types) = @_;
 
     my $problem = $c->stash->{problem} or die;
+
+    return unless @types; # If nothing moderated, nothing to do
+    return if $c->stash->{moderate_errors}; # Don't update anything if errors
+
+    # Okay, now update the report
+    $problem->update;
+
+    return if @types == 1 && $types[0] eq 'state'; # If only state changed, no log entry needed
+
+    # We've done some non-state moderation, save the history
+    $c->stash->{history}->insert;
 
     $c->forward('moderate_log_entry', [ 'problem', @types ]);
 
@@ -198,12 +244,9 @@ sub moderate_text : Private {
         : $c->get_param($param . $thing);
 
     if ($new ne $old) {
-        $c->stash->{history}->insert;
-        $object->update({ $thing => $new });
+        $object->$thing($new);
         return $thing_for_original_table;
     }
-
-    return;
 }
 
 sub moderate_boolean : Private {
@@ -224,15 +267,14 @@ sub moderate_boolean : Private {
     my $old = $object->$thing ? 1 : 0;
 
     if ($new != $old) {
-        $c->stash->{history}->insert;
         if ($thing eq 'photo') {
-            $object->update({ $thing => $new ? $original : undef });
+            $object->$thing($new ? $original : undef);
+            $object->get_photoset->delete_cached;
         } else {
-            $object->update({ $thing => $new });
+            $object->$thing($new);
         }
         return $thing;
     }
-    return;
 }
 
 sub moderate_extra : Private {
@@ -252,8 +294,6 @@ sub moderate_extra : Private {
         }
     }
     if ($changed) {
-        $c->stash->{history}->insert;
-        $object->update;
         return 'extra';
     }
 }
@@ -266,14 +306,9 @@ sub moderate_location : Private {
     my $moved = $c->forward('/admin/report_edit_location', [ $problem ]);
     if (!$moved) {
         # New lat/lon isn't valid, show an error
-        $c->flash->{moderate_errors} ||= [];
-        push @{ $c->flash->{moderate_errors} }, _('Invalid location. New location must be covered by the same council.');
-        return;
-    }
-
-    if ($moved == 2) {
-        $c->stash->{history}->insert;
-        $problem->update;
+        $c->stash->{moderate_errors} ||= [];
+        push @{ $c->stash->{moderate_errors} }, _('Invalid location. New location must be covered by the same council.');
+    } elsif ($moved == 2) {
         return 'location';
     }
 }
@@ -292,9 +327,34 @@ sub moderate_category : Private {
     my $changed = $c->forward( '/admin/report_edit_category', [ $problem, 1 ] );
     # It might need to set_report_extras in future
     if ($changed) {
-        $c->stash->{history}->insert;
-        $problem->update;
         return 'category';
+    }
+}
+
+# Note that if a cobrand allows state moderation, then the moderation reason
+# given will be added as an update and thus be publicly available (unlike with
+# normal moderation).
+sub moderate_state : Private {
+    my ($self, $c) = @_;
+
+    my $new_state = $c->get_param('state');
+    return unless $new_state;
+
+    my $problem = $c->stash->{problem};
+    if ($problem->state ne $new_state) {
+        $problem->state($new_state);
+        $problem->add_to_comments( {
+            text => $c->stash->{moderation_reason},
+            created => \'current_timestamp',
+            confirmed => \'current_timestamp',
+            user_id => $c->user->id,
+            name => $c->user->from_body ? $c->user->from_body->name : $c->user->name,
+            state => 'confirmed',
+            mark_fixed => 0,
+            anonymous => $c->user->from_body ? 0 : 1,
+            problem_state => $new_state,
+        } );
+        return 'state';
     }
 }
 
@@ -326,7 +386,11 @@ sub moderate_update : Chained('update') : PathPart('') : Args(0) {
         $c->forward('moderate_extra'),
         $c->forward('moderate_boolean', [ 'photo' ]);
 
-    $c->detach('moderate_log_entry', [ 'update', @types ]);
+    if (@types) {
+        $c->stash->{history}->insert;
+        $c->stash->{comment}->update;
+        $c->detach('moderate_log_entry', [ 'update', @types ]);
+    }
 }
 
 sub update_moderate_hide : Private {
@@ -339,7 +403,6 @@ sub update_moderate_hide : Private {
         $comment->hide;
         $c->detach('moderate_log_entry', [ 'update', 'hide' ]); # break chain here.
     }
-    return;
 }
 
 __PACKAGE__->meta->make_immutable;

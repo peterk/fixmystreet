@@ -1,6 +1,27 @@
 ## Releases
 
 * Unreleased
+    - Front end improvements:
+        - Track map state in URL to make sharing links easier. #2242
+    - Admin improvements:
+        - Include moderation history in report updates. #2379
+        - Allow moderation to potentially change state. #2381
+        - Spot moderation conflicts and raise an error. #2384
+        - Allow searching for <email> in admin.
+        - Make staff JavaScript more self-contained.
+        - Alow staff user to be associated with multiple areas.
+    - Bugfixes:
+        - Check cached reports do still have photos before being shown. #2374
+        - Delete cache photos upon photo moderation. #2374
+        - Remove any use of `my $x if $foo`. #2377
+        - Fix saving of inspect form data offline.
+        - Add CSRF and time to contact form.
+        - Make sure admin metadata dropdown index numbers are updated too.
+        - Fix issue with Open311 codes starting with ‘_’.
+        - Add parameter to URL when “Show older” clicked.
+    - Development improvements:
+        - Make front page cache time configurable.
+        - Better working of /fakemapit/ under https.
 
 * v2.5 (21st December 2018)
     - Front end improvements:

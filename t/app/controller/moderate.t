@@ -139,6 +139,20 @@ subtest 'Problem moderation' => sub {
         is $history[1]->title, 'Good good', 'Correct second title';
     };
 
+    subtest 'Post modified title after edited elsewhere' => sub {
+        $mech->submit_form_ok({ with_fields => {
+            %problem_prepopulated,
+            problem_title => 'Good good',
+            form_started => 1, # January 1970!
+        }});
+        $mech->base_like( qr{\Q/moderate$REPORT_URL\E} );
+        $mech->content_contains('Good bad good'); # Displayed title
+        $mech->content_contains('Good good'); # Form edit
+
+        $report->discard_changes;
+        is $report->title, 'Good bad good', 'title unchanged';
+    };
+
     subtest 'Make anonymous' => sub {
         $mech->content_lacks('Reported anonymously');
 
@@ -257,8 +271,12 @@ subtest 'Problem moderation' => sub {
         $report->discard_changes;
         is $report->get_extra_metadata('weather'), 'snow';
         is $report->get_extra_metadata('moon'), 'waning full';
-        is $report->moderation_original_data->get_extra_metadata('moon'), 'waxing full';
-        is $report->moderation_original_data->get_extra_metadata('weather'), undef;
+        my $mod = $report->moderation_original_data;
+        is $mod->get_extra_metadata('moon'), 'waxing full';
+        is $mod->get_extra_metadata('weather'), undef;
+
+        my $diff = $mod->extra_diff($report, 'moon');
+        is $diff, "wa<del style='background-color:#fcc'>x</del><ins style='background-color:#cfc'>n</ins>ing full", 'Correct diff';
     };
 
     subtest 'Moderate category' => sub {
@@ -271,6 +289,30 @@ subtest 'Problem moderation' => sub {
         });
         $report->discard_changes;
         is $report->category, 'Lost toys';
+    };
+
+    subtest 'Moderate state' => sub {
+        my $mods_count = $report->moderation_original_datas->count;
+        my ($csrf) = $mech->content =~ /meta content="([^"]*)" name="csrf-token"/;
+        $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
+            %problem_prepopulated,
+            state => 'confirmed',
+            token => $csrf,
+        });
+        $report->discard_changes;
+        is $report->state, 'confirmed', 'state has not changed';
+        is $report->comments->count, 0, 'same state, no update';
+        is $report->moderation_original_datas->count, $mods_count, 'No moderation entry either';
+        $mech->post_ok('http://www.example.org/moderate/report/' . $report->id, {
+            %problem_prepopulated,
+            state => 'in progress',
+            token => $csrf,
+        });
+        $report->discard_changes;
+        is $report->state, 'in progress', 'state has changed';
+        is $report->comments->count, 1, 'a new update added';
+        $report->update({ state => 'confirmed' });
+        is $report->moderation_original_datas->count, $mods_count, 'No moderation entry, only state changed';
     };
 
     subtest 'Moderate location' => sub {
@@ -327,6 +369,7 @@ sub create_update {
         text      => 'update good good bad good',
         state     => 'confirmed',
         mark_fixed => 0,
+        confirmed => $dt,
     });
 }
 my %update_prepopulated = (

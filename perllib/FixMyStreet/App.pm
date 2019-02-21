@@ -237,9 +237,9 @@ sub setup_request {
     $c->stash->{map_js} = FixMyStreet::Map::map_javascript();
 
     unless ( FixMyStreet->config('MAPIT_URL') ) {
-        my $port = $c->req->uri->port;
-        $host = "$host:$port" unless $port == 80;
-        mySociety::MaPit::configure( "http://$host/fakemapit/" );
+        my $host_port = $c->req->uri->host_port;
+        my $scheme = $c->req->uri->scheme;
+        mySociety::MaPit::configure( "$scheme://$host_port/fakemapit/" );
     }
 
     $c->stash->{has_fixed_state} = FixMyStreet::DB::Result::Problem::fixed_states->{fixed};
@@ -418,27 +418,6 @@ sub uri_with {
     }
     $uri->query_form(\%params);
     return $uri;
-}
-
-=head2 uri_for
-
-    $uri = $c->uri_for( ... );
-
-Like C<uri_for> except that it passes the uri to the cobrand to be altered if
-needed.
-
-=cut
-
-sub uri_for {
-    my $c    = shift;
-    my @args = @_;
-
-    my $uri = $c->next::method(@args);
-
-    my $cobranded_uri = $c->cobrand->uri($uri);
-
-    # note that the returned uri may be a string not an object (eg cities)
-    return $cobranded_uri;
 }
 
 =head2 uri_for_email

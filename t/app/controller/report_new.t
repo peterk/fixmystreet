@@ -24,10 +24,15 @@ subtest "test that bare requests to /report/new get redirected" => sub {
         MAPIT_URL => 'http://mapit.uk/',
     }, sub {
         $mech->get_ok('/report/new?pc=SW1A%201AA');
+        is $mech->uri->path, '/around', "went to /around";
+        is_deeply { $mech->uri->query_form }, { pc => 'SW1A 1AA' },
+          "pc correctly transferred";
+
+        $mech->get_ok('/report/new?pc_override=SW1A%201AA&latitude=51&longitude=-2');
+        is $mech->uri->path, '/around', "went to /around";
+        is_deeply { $mech->uri->query_form }, { pc => 'SW1A 1AA' },
+          "pc correctly transferred, lat/lon gone";
     };
-    is $mech->uri->path, '/around', "went to /around";
-    is_deeply { $mech->uri->query_form }, { pc => 'SW1A 1AA' },
-      "pc correctly transferred";
 };
 
 my %body_ids;
@@ -588,6 +593,26 @@ foreach my $test (
         },
         changes => { },
         errors => [ 'Please enter a subject', 'Please enter some details', 'Names are limited to 40 characters in length.' ],
+    },
+    {
+        msg    => 'Oxfordshire validation',
+        pc     => 'OX20 1SZ',
+        fields => {
+            title         => '',
+            detail        => '',
+            photo1        => '',
+            photo2        => '',
+            photo3        => '',
+            name          => 'This is a really extraordinarily long name that definitely should fail validation',
+            may_show_name => '1',
+            username      => 'bob.has.a.very.long.email@thisisalonghostname.example.com',
+            phone         => '01234 5678910 09876 54321 ext 203',
+            category      => 'Trees',
+            password_sign_in => '',
+            password_register => '',
+        },
+        changes => { },
+        errors => [ 'Please enter a subject', 'Please enter some details', 'Emails are limited to 50 characters in length.', 'Phone numbers are limited to 30 characters in length.', 'Names are limited to 50 characters in length.'],
     },
   )
 {
@@ -1782,9 +1807,9 @@ subtest "unresponsive body handling works" => sub {
         my $body_id = $contact1->body->id;
         my $extra_details = $mech->get_ok_json('/report/new/ajax?latitude=55.952055&longitude=-3.189579');
         like $extra_details->{top_message}, qr{Edinburgh.*accept reports.*/unresponsive\?body=$body_id};
-        is $extra_details->{unresponsive}, $body_id, "unresponsive json set";
+        is_deeply $extra_details->{unresponsive}, { $body_id => 1 }, "unresponsive json set";
         $extra_details = $mech->get_ok_json('/report/new/category_extras?category=Street%20lighting&latitude=55.952055&longitude=-3.189579');
-        is $extra_details->{unresponsive}, $body_id, "unresponsive json set";
+        is_deeply $extra_details->{unresponsive}, { $body_id => 1 }, "unresponsive json set";
 
         my $test_email = 'test-2@example.com';
         $mech->log_out_ok;
@@ -1861,7 +1886,7 @@ subtest "unresponsive body handling works" => sub {
         $extra_details = $mech->get_ok_json('/report/new/ajax?latitude=51.896268&longitude=-2.093063');
         like $extra_details->{by_category}{$contact3->category}{category_extra}, qr/Cheltenham.*Trees.*unresponsive.*category=Trees/s;
         $extra_details = $mech->get_ok_json('/report/new/category_extras?category=Trees&latitude=51.896268&longitude=-2.093063');
-        is $extra_details->{unresponsive}, $contact3->body->id, "unresponsive json set";
+        is_deeply $extra_details->{unresponsive}, { $contact3->body->id => 1 }, "unresponsive json set";
 
         $mech->get_ok('/around');
         $mech->submit_form_ok( { with_fields => { pc => 'GL50 2PR', } }, "submit location" );

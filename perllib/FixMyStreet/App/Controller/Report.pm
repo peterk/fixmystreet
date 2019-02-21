@@ -233,11 +233,30 @@ sub load_updates : Private {
         next if $questionnaires_with_updates{$q->id};
         push @combined, [ $q->whenanswered, $q ];
     }
+
+    # And include moderation changes...
+    my $problem = $c->stash->{problem};
+    my $public_history = $c->cobrand->call_hook(public_moderation_history => $problem);
+    my $user_can_moderate = $c->user_exists && $c->user->can_moderate($problem);
+    if ($public_history || $user_can_moderate) {
+        my @history = $problem->moderation_history;
+        my $last_history = $problem;
+        foreach my $history (@history) {
+            push @combined, [ $history->created, {
+                id => 'm' . $history->id,
+                type => 'moderation',
+                last => $last_history,
+                entry => $history,
+            } ];
+            $last_history = $history;
+        }
+    }
+
     @combined = map { $_->[1] } sort { $a->[0] <=> $b->[0] } @combined;
     $c->stash->{updates} = \@combined;
 
     if ($c->sessionid) {
-        foreach (qw(alert_to_reporter anonymized moderate_errors)) {
+        foreach (qw(alert_to_reporter anonymized)) {
             $c->stash->{$_} = $c->flash->{$_} if $c->flash->{$_};
         }
     }
@@ -354,7 +373,7 @@ sub inspect : Private {
     my $permissions = $c->stash->{_permissions};
 
     $c->forward('/admin/categories_for_point');
-    $c->stash->{report_meta} = { map { $_->{name} => $_ } @{ $c->stash->{problem}->get_extra_fields() } };
+    $c->stash->{report_meta} = { map { 'x' . $_->{name} => $_ } @{ $c->stash->{problem}->get_extra_fields() } };
 
     if ($c->cobrand->can('council_area_id')) {
         my $priorities_by_category = FixMyStreet::App->model('DB::ResponsePriority')->by_categories($c->cobrand->council_area_id, @{$c->stash->{contacts}});

@@ -67,6 +67,10 @@ sub to_body {
 
 # Front page statistics
 
+sub _cache_timeout {
+    FixMyStreet->config('CACHE_TIMEOUT') // 3600;
+}
+
 sub recent_fixed {
     my $rs = shift;
     my $key = "recent_fixed:$site_key";
@@ -76,7 +80,7 @@ sub recent_fixed {
             state => [ FixMyStreet::DB::Result::Problem->fixed_states() ],
             lastupdate => { '>', \"current_timestamp-'1 month'::interval" },
         } )->count;
-        Memcached::set($key, $result, 3600);
+        Memcached::set($key, $result, _cache_timeout());
     }
     return $result;
 }
@@ -90,7 +94,7 @@ sub number_comments {
             { 'comments.state' => 'confirmed' },
             { join => 'comments' }
         )->count;
-        Memcached::set($key, $result, 3600);
+        Memcached::set($key, $result, _cache_timeout());
     }
     return $result;
 }
@@ -105,7 +109,7 @@ sub recent_new {
             state => [ FixMyStreet::DB::Result::Problem->visible_states() ],
             confirmed => { '>', \"current_timestamp-'$interval'::interval" },
         } )->count;
-        Memcached::set($key, $result, 3600);
+        Memcached::set($key, $result, _cache_timeout());
     }
     return $result;
 }
@@ -154,10 +158,10 @@ sub _recent {
             # Need to reattach schema so that confirmed column gets reinflated.
             $probs->[0]->result_source->schema( $rs->result_source->schema ) if $probs->[0];
             # Catch any cached ones since hidden
-            $probs = [ grep { ! $_->is_hidden } @$probs ];
+            $probs = [ grep { $_->photo && ! $_->is_hidden } @$probs ];
         } else {
             $probs = [ $rs->search( $query, $attrs )->all ];
-            Memcached::set($key, $probs, 3600);
+            Memcached::set($key, $probs, _cache_timeout());
         }
     }
 

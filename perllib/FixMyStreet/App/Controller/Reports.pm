@@ -74,7 +74,8 @@ sub index : Path : Args(0) {
     }
 
     # Down here so that error pages aren't cached.
-    $c->response->header('Cache-Control' => 'max-age=3600');
+    my $max_age = FixMyStreet->config('CACHE_TIMEOUT') // 3600;
+    $c->response->header('Cache-Control' => 'max-age=' . $max_age);
 }
 
 =head2 display_body_stats
@@ -449,7 +450,7 @@ sub summary : Private {
 
     # required to stop errors in generate_grouped_data
     $c->stash->{q_state} = '';
-    $c->stash->{ward} = $c->get_param('area');
+    $c->stash->{ward} = [ $c->get_param('area') || () ];
     $c->stash->{start_date} = $dtf->format_date($start_date);
     $c->stash->{end_date} = $c->get_param('end_date');
 

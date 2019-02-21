@@ -215,6 +215,9 @@ update. Clicking this button gives you the ability to:
 
 You can also add a note to indicate the reason for the change to the report.
 
+Moderation history will be shown within the report updates, and is only visible to people with
+the moderate permission.
+
 #### Hiding reports
 
 Clicking the moderation button also gives you the option to hide an entire report or its updates.
@@ -703,7 +706,7 @@ For a more detailed breakdown, visit the stats dashboard. This can be accessed b
 From here, you can access statistics on:
 
 - All reports made across the council area
-- Reports made within any specific ward
+- Reports made within any specific ward or wards
 - Reports made within any specific category
 - Reports made between specific dates
 - Reports that have a specific status, eg ‘open’ or ‘fixed’

@@ -120,6 +120,7 @@ sub compare_anonymous {
 
 sub compare_coords {
     my ($self, $other) = @_;
+    return '' unless $self->latitude && $self->longitude;
     my $old = join ',', $self->latitude, $self->longitude;
     my $new = join ',', $other->latitude, $other->longitude;
     string_diff($old, $new, single => 1);
@@ -167,7 +168,14 @@ sub compare_extra {
             push @s, string_diff("$_ = $old->{$_}", "");
         }
     }
-    return join ', ', @s;
+    return join ', ', grep { $_ } @s;
+}
+
+sub extra_diff {
+    my ($self, $other, $key) = @_;
+    my $o = $self->get_extra_metadata($key);
+    my $n = $other->get_extra_metadata($key);
+    return string_diff($o, $n);
 }
 
 sub string_diff {
@@ -179,6 +187,7 @@ sub string_diff {
     $new = FixMyStreet::Template::html_filter($new);
 
     if ($options{single}) {
+        return unless $old;
         $old = [ $old ];
         $new = [ $new ];
     }
