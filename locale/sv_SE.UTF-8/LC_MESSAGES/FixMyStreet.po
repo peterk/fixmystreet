@@ -4489,7 +4489,7 @@ msgstr "Problemet har markerats som skickat."
 
 #: perllib/FixMyStreet/App/Controller/Admin.pm:911
 msgid "That problem will now be resent."
-msgstr "Rapportern kommer nu att skickas om."
+msgstr "Rapporten kommer nu att skickas om."
 
 #: perllib/FixMyStreet/App/Controller/Report.pm:161
 msgid "That report cannot be viewed on %s."
@@ -4990,7 +4990,7 @@ msgstr "Det här problemet är markerat som löst"
 
 #: perllib/FixMyStreet/Script/Alerts.pm:121
 msgid "This report is currently marked as open."
-msgstr "Den här rapportern är öppen"
+msgstr "Den här rapporten är öppen"
 
 #: templates/web/base/report/display.html:58
 msgid "This report is now closed to updates."
@@ -5481,7 +5481,7 @@ msgstr ""
 
 #: templates/web/base/index-steps.html:11
 msgid "We send it to the council on your behalf"
-msgstr "Vi skickar rapportern till berörd kommun"
+msgstr "Vi skickar rapporten till berörd kommun"
 
 #: templates/web/base/alert/choose.html:13
 #: templates/web/base/around/_error_multiple.html:17
