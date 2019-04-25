@@ -107,11 +107,17 @@ sub open311_post_send {
     # Check Open311 was successful
     return unless $row->external_id;
 
-    # For Flytipping, send an email also
-    return unless $row->category eq 'Flytipping';
+    # For certain categories, send an email also
+    my $addresses = {
+        'Flytipping' => [ join('@', 'illegaldumpingcosts', $self->admin_user_domain), "TfB" ],
+        'Blocked drain' => [ join('@', 'floodmanagement', $self->admin_user_domain), "Flood Management" ],
+        'Ditch issue' => [ join('@', 'floodmanagement', $self->admin_user_domain), "Flood Management" ],
+        'Flooded subway' => [ join('@', 'floodmanagement', $self->admin_user_domain), "Flood Management" ],
+    };
+    my $dest = $addresses->{$row->category};
+    return unless $dest;
 
-    my $e = join('', 'illegaldumpingcosts', '@', $self->admin_user_domain);
-    my $sender = FixMyStreet::SendReport::Email->new( to => [ [ $e, 'TfB' ] ] );
+    my $sender = FixMyStreet::SendReport::Email->new( to => [ $dest ] );
     $sender->send($row, $h);
 }
 
@@ -196,6 +202,39 @@ sub map_type { 'Buckinghamshire' }
 sub default_map_zoom { 3 }
 
 sub enable_category_groups { 1 }
+
+sub _dashboard_export_add_columns {
+    my $self = shift;
+    my $c = $self->{c};
+
+    push @{$c->stash->{csv}->{headers}}, "Staff User";
+    push @{$c->stash->{csv}->{columns}}, "staff_user";
+
+    # All staff users, for contributed_by lookup
+    my @user_ids = $c->model('DB::User')->search(
+        { from_body => $self->body->id },
+        { columns => [ 'id', 'email', ] })->all;
+    my %user_lookup = map { $_->id => $_->email } @user_ids;
+
+    $c->stash->{csv}->{extra_data} = sub {
+        my $report = shift;
+        my $staff_user = '';
+        if (my $contributed_by = $report->get_extra_metadata('contributed_by')) {
+            $staff_user = $user_lookup{$contributed_by};
+        }
+        return {
+            staff_user => $staff_user,
+        };
+    };
+}
+
+sub dashboard_export_updates_add_columns {
+    shift->_dashboard_export_add_columns;
+}
+
+sub dashboard_export_problems_add_columns {
+    shift->_dashboard_export_add_columns;
+}
 
 # Enable adding/editing of parish councils in the admin
 sub add_extra_areas {
@@ -408,7 +447,7 @@ sub should_skip_sending_update {
 
 sub disable_phone_number_entry { 1 }
 
-sub report_sent_confirmation_email { 1 }
+sub report_sent_confirmation_email { 'external_id' }
 
 sub is_council_with_case_management { 1 }
 

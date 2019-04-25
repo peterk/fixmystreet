@@ -15,8 +15,8 @@ my $params = {
     endpoint => 'endpoint',
     jurisdiction => 'home',
 };
-my $bromley = $mech->create_body_ok(2482, 'Bromley', { %$params, send_extended_statuses => 1 });
-my $oxon = $mech->create_body_ok(2237, 'Oxfordshire', $params);
+my $bromley = $mech->create_body_ok(2482, 'Bromley', { %$params, send_extended_statuses => 1, id => 5 });
+my $oxon = $mech->create_body_ok(2237, 'Oxfordshire', { %$params, id => 55 });
 my $bucks = $mech->create_body_ok(2217, 'Buckinghamshire', $params);
 my $lewisham = $mech->create_body_ok(2492, 'Lewisham', $params);
 
@@ -34,21 +34,26 @@ subtest 'Check Open311 params' => sub {
     is_deeply \%conf, {
         %$result,
         extended_statuses => 1,
-        use_extended_updates => 1,
         endpoints => { service_request_updates => 'update.xml', update => 'update.xml' },
+        fixmystreet_body => $bromley,
     }, 'Bromley params match';
     %conf = $o->open311_params($oxon);
     is_deeply \%conf, {
         %$result,
-        use_customer_reference => 1
+        use_customer_reference => 1,
+        fixmystreet_body => $oxon,
     }, 'Oxfordshire params match';
     %conf = $o->open311_params($bucks);
     is_deeply \%conf, {
         %$result,
         mark_reopen => 1,
+        fixmystreet_body => $bucks,
     }, 'Bucks params match';
     %conf = $o->open311_params($lewisham);
-    is_deeply \%conf, $result, 'Lewisham params match';
+    is_deeply \%conf, {
+        %$result,
+        fixmystreet_body => $lewisham,
+    }, 'Lewisham params match';
   };
 };
 

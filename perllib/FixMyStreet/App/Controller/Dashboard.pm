@@ -3,10 +3,12 @@ use Moose;
 use namespace::autoclean;
 
 use DateTime;
+use Encode;
 use JSON::MaybeXS;
 use Path::Tiny;
 use Text::CSV;
 use Time::Piece;
+use FixMyStreet::DateRange;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -161,16 +163,16 @@ sub construct_rs_filter : Private {
         $where{"$table_name.state"} = [ FixMyStreet::DB::Result::Problem->visible_states() ];
     }
 
-    my $dtf = $c->model('DB')->storage->datetime_parser;
+    my $days30 = DateTime->now(time_zone => FixMyStreet->time_zone || FixMyStreet->local_time_zone)->subtract(days => 30);
+    $days30->truncate( to => 'day' );
 
-    my $start_date = $dtf->parse_datetime($c->stash->{start_date});
-    $where{"$table_name.confirmed"} = { '>=', $dtf->format_datetime($start_date) };
-
-    if (my $end_date = $c->stash->{end_date}) {
-        my $one_day = DateTime::Duration->new( days => 1 );
-        $end_date = $dtf->parse_datetime($end_date) + $one_day;
-        $where{"$table_name.confirmed"} = [ -and => $where{"$table_name.confirmed"}, { '<', $dtf->format_datetime($end_date) } ];
-    }
+    my $range = FixMyStreet::DateRange->new(
+        start_date => $c->stash->{start_date},
+        start_default => $days30,
+        end_date => $c->stash->{end_date},
+        formatter => $c->model('DB')->storage->datetime_parser,
+    );
+    $where{"$table_name.confirmed"} = $range->sql;
 
     $c->stash->{params} = \%where;
     my $rs = $updates ? $c->cobrand->updates : $c->cobrand->problems;
@@ -292,7 +294,7 @@ sub generate_summary_figures {
 sub generate_body_response_time : Private {
     my ( $self, $c ) = @_;
 
-    my $avg = $c->stash->{body}->calculate_average;
+    my $avg = $c->stash->{body}->calculate_average($c->cobrand->call_hook("body_responsiveness_threshold"));
     $c->stash->{body_average} = $avg ? int($avg / 60 / 60 / 24 + 0.5) : 0;
 }
 
@@ -408,12 +410,29 @@ hashref of extra data to include that can be used by 'columns'.
 sub generate_csv : Private {
     my ($self, $c) = @_;
 
+    my $filename = $c->stash->{csv}->{filename};
+    $c->res->content_type('text/csv; charset=utf-8');
+    $c->res->header('content-disposition' => "attachment; filename=\"${filename}.csv\"");
+
+    # Emit a header (copying Drupal's naming) telling an intermediary (e.g.
+    # Varnish) not to buffer the output. Varnish will need to know this, e.g.:
+    #   if (beresp.http.Surrogate-Control ~ "BigPipe/1.0") {
+    #     set beresp.do_stream = true;
+    #     set beresp.ttl = 0s;
+    #   }
+    $c->res->header('Surrogate-Control' => 'content="BigPipe/1.0"');
+
+    # Tell nginx not to buffer this response
+    $c->res->header('X-Accel-Buffering' => 'no');
+
+    # Define an empty body so the web view doesn't get added at the end
+    $c->res->body("");
+
     # Old parameter renaming
     $c->stash->{csv}->{objects} //= $c->stash->{csv}->{problems};
 
     my $csv = Text::CSV->new({ binary => 1, eol => "\n" });
-    $csv->combine(@{$c->stash->{csv}->{headers}});
-    my @body = ($csv->string);
+    $csv->print($c->response, $c->stash->{csv}->{headers});
 
     my $fixed_states = FixMyStreet::DB::Result::Problem->fixed_states;
     my $closed_states = FixMyStreet::DB::Result::Problem->closed_states;
@@ -467,19 +486,15 @@ sub generate_csv : Private {
             $hashref = { %$hashref, %$extra };
         }
 
-        $csv->combine(
+        $csv->print($c->response, [
+            map {
+                $_ = encode('UTF-8', $_) if $_;
+            }
             @{$hashref}{
                 @{$c->stash->{csv}->{columns}}
             },
-        );
-
-        push @body, $csv->string;
+        ] );
     }
-
-    my $filename = $c->stash->{csv}->{filename};
-    $c->res->content_type('text/csv; charset=utf-8');
-    $c->res->header('content-disposition' => "attachment; filename=\"${filename}.csv\"");
-    $c->res->body( join "", @body );
 }
 
 =head1 AUTHOR

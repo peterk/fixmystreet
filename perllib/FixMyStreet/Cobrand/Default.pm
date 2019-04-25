@@ -13,7 +13,6 @@ use URI;
 use Digest::MD5 qw(md5_hex);
 
 use Carp;
-use mySociety::MaPit;
 use mySociety::PostcodeUtil;
 
 =head1 The default cobrand
@@ -235,6 +234,18 @@ or a hashref.
 sub base_url_for_report {
     my ( $self, $report ) = @_;
     return $self->base_url_with_lang;
+}
+
+=item relative_url_for_report
+
+Returns the relative base url for a report (might be different in a two-tier
+county, but normally blank). Report may be an object, or a hashref.
+
+=cut
+
+sub relative_url_for_report {
+    my ( $self, $report ) = @_;
+    return "";
 }
 
 =item base_host
@@ -1000,9 +1011,7 @@ Returns true if the show name checkbox should be ticked by default.
 
 =cut
 
-sub default_show_name {
-    1;
-}
+sub default_show_name { 0 }
 
 =item report_check_for_errors
 
@@ -1021,7 +1030,7 @@ sub report_check_for_errors {
     );
 }
 
-sub report_sent_confirmation_email { 0; }
+sub report_sent_confirmation_email { '' }
 
 =item never_confirm_reports
 
@@ -1172,6 +1181,7 @@ Return true if an Open311 service attribute should be a hidden field.
 
 sub category_extra_hidden {
     my ($self, $meta) = @_;
+    return 1 if ($meta->{automated} || '') eq 'hidden_field';
     return 0;
 }
 
@@ -1234,5 +1244,13 @@ still be sent (because it wasn't disabled on the FixMyStreet cobrand).
 =cut
 
 sub send_moderation_notifications { 1 }
+
+=item privacy_policy_url
+
+The URL of the privacy policy to use on the report and update submissions forms.
+
+=cut
+
+sub privacy_policy_url { '/privacy' }
 
 1;

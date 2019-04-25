@@ -6,9 +6,11 @@ my $mech = FixMyStreet::TestMech->new;
 
 my $body = $mech->create_body_ok(2217, 'Buckinghamshire', {
     send_method => 'Open311', api_key => 'key', endpoint => 'endpoint', jurisdiction => 'fms' });
+my $counciluser = $mech->create_user_ok('counciluser@example.com', name => 'Council User', from_body => $body);
 
 $mech->create_contact_ok(body_id => $body->id, category => 'Flytipping', email => "FLY");
 $mech->create_contact_ok(body_id => $body->id, category => 'Potholes', email => "POT");
+$mech->create_contact_ok(body_id => $body->id, category => 'Blocked drain', email => "DRA");
 
 my $district = $mech->create_body_ok(2257, 'Chiltern');
 $mech->create_contact_ok(body_id => $district->id, category => 'Flytipping', email => "flytipping\@chiltern");
@@ -36,6 +38,7 @@ subtest 'cobrand displays correct categories' => sub {
     my $json = $mech->get_ok_json('/report/new/ajax?latitude=51.615559&longitude=-0.556903');
     is @{$json->{bodies}}, 2, 'Both Chiltern and Bucks returned';
     like $json->{category}, qr/Flytipping/, 'Flytipping displayed';
+    like $json->{category}, qr/Blocked drain/, 'Blocked drain displayed';
     unlike $json->{category}, qr/Graffiti/, 'Graffiti not displayed';
     $json = $mech->get_ok_json('/report/new/category_extras?latitude=51.615559&longitude=-0.556903');
     is @{$json->{bodies}}, 2, 'Still both Chiltern and Bucks returned';
@@ -48,9 +51,10 @@ my ($report) = $mech->create_problems_for_body(1, $body->id, 'On Road', {
 
 subtest 'flytipping on road sent to extra email' => sub {
     FixMyStreet::Script::Reports::send();
-    my $email = $mech->get_email;
+    my @email = $mech->get_email;
     my $tfb = join('', 'illegaldumpingcosts', '@', 'buckscc.gov.uk');
-    is $email->header('To'), '"TfB" <' . $tfb . '>';
+    is $email[0]->header('To'), '"TfB" <' . $tfb . '>';
+    like $mech->get_text_body_from_email($email[1]), qr/report's reference number/;
     $report->discard_changes;
     is $report->external_id, 248, 'Report has right external ID';
 };
@@ -58,26 +62,46 @@ subtest 'flytipping on road sent to extra email' => sub {
 ($report) = $mech->create_problems_for_body(1, $body->id, 'On Road', {
     category => 'Potholes', cobrand => 'fixmystreet',
     latitude => 51.812244, longitude => -0.827363,
+    extra => {
+        contributed_as => 'another_user',
+        contributed_by => $counciluser->id,
+    },
 });
 
-subtest 'pothole on road not sent to extra email' => sub {
+subtest 'pothole on road not sent to extra email, only confirm sent' => sub {
     $mech->clear_emails_ok;
     FixMyStreet::Script::Reports::send();
-    $mech->email_count_is(0);
+    $mech->email_count_is(1);
+    like $mech->get_text_body_from_email, qr/report's reference number/;
     $report->discard_changes;
     is $report->external_id, 248, 'Report has right external ID';
 };
 
 ($report) = $mech->create_problems_for_body(1, $district->id, 'Off Road', {
-    category => 'Flytipping', cobrand => 'fixmystreet',
+    category => 'Flytipping', cobrand => 'buckinghamshire',
     latitude => 51.813173, longitude => -0.826741,
 });
 subtest 'flytipping off road sent to extra email' => sub {
     FixMyStreet::Script::Reports::send();
-    my $email = $mech->get_email;
-    is $email->header('To'), '"Chiltern" <flytipping@chiltern>';
+    my @email = $mech->get_email;
+    is $email[0]->header('To'), '"Chiltern" <flytipping@chiltern>';
+    like $mech->get_text_body_from_email($email[1]), qr/Please note that Buckinghamshire County Council is not responsible/;
     $report->discard_changes;
     is $report->external_id, undef, 'Report has right external ID';
+};
+
+my ($report2) = $mech->create_problems_for_body(1, $body->id, 'Drainage problem', {
+    category => 'Blocked drain', cobrand => 'fixmystreet',
+    latitude => 51.812244, longitude => -0.827363,
+});
+
+subtest 'blocked drain sent to extra email' => sub {
+    $mech->clear_emails_ok;
+    FixMyStreet::Script::Reports::send();
+    my @email = $mech->get_email;
+    my $e = join('@', 'floodmanagement', 'buckscc.gov.uk');
+    is $email[0]->header('To'), '"Flood Management" <' . $e . '>';
+    like $mech->get_text_body_from_email($email[1]), qr/report's reference number/;
 };
 
 $cobrand = FixMyStreet::Cobrand::Buckinghamshire->new();
@@ -171,6 +195,50 @@ for my $test (
         is $cobrand->filter_report_description($test->{in}), $test->{out}, "filtered correctly";
     };
 }
+
+subtest 'extra CSV columns are present' => sub {
+    $mech->log_in_ok( $counciluser->email );
+
+    $mech->get_ok('/dashboard?export=1');
+
+    my @rows = $mech->content_as_csv;
+    is scalar @rows, 5, '1 (header) + 4 (reports) = 5 lines';
+    is scalar @{$rows[0]}, 21, '21 columns present';
+
+    is_deeply $rows[0],
+        [
+            'Report ID', 'Title', 'Detail', 'User Name', 'Category',
+            'Created', 'Confirmed', 'Acknowledged', 'Fixed', 'Closed',
+            'Status', 'Latitude', 'Longitude', 'Query', 'Ward',
+            'Easting', 'Northing', 'Report URL', 'Site Used',
+            'Reported As', 'Staff User',
+        ],
+        'Column headers look correct';
+
+    is $rows[1]->[20], '', 'Staff User is empty if not made on behalf of another user';
+    is $rows[2]->[20], $counciluser->email, 'Staff User is correct if made on behalf of another user';
+    is $rows[3]->[20], '', 'Staff User is empty if not made on behalf of another user';
+
+    $mech->create_comment_for_problem($report, $counciluser, 'Staff User', 'Some update text', 'f', 'confirmed', undef, {
+        extra => { contributed_as => 'body' }});
+    $mech->create_comment_for_problem($report, $counciluser, 'Other User', 'Some update text', 'f', 'confirmed', undef, {
+        extra => { contributed_as => 'another_user', contributed_by => $counciluser->id }});
+
+    $mech->get_ok('/dashboard?export=1&updates=1');
+
+    @rows = $mech->content_as_csv;
+    is scalar @rows, 3, '1 (header) + 2 (updates)';
+    is scalar @{$rows[0]}, 9, '9 columns present';
+    is_deeply $rows[0],
+        [
+            'Report ID', 'Update ID', 'Date', 'Status', 'Problem state',
+            'Text', 'User Name', 'Reported As', 'Staff User',
+        ],
+        'Column headers look correct';
+
+    is $rows[1]->[8], '', 'Staff User is empty if not made on behalf of another user';
+    is $rows[2]->[8], $counciluser->email, 'Staff User is correct if made on behalf of another user';
+};
 
 };
 

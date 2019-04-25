@@ -21,7 +21,7 @@ var defaults = {
     asset_id_field: 'central_as',
     attributes: {
         central_asset_id: 'central_as',
-        site_code: 'Site_code'
+        site_code: 'site_code'
     },
     geometryName: 'msGeometry',
     srsName: "EPSG:3857",
@@ -34,10 +34,6 @@ fixmystreet.assets.add($.extend(true, {}, defaults, {
         params: {
             TYPENAME: "Grit_Bins"
         }
-    },
-    attributes: {
-        central_asset_id: 'central_as',
-        site_code: 'site_code' // different capitalisation, sigh
     },
     asset_category: ["Salt bin damaged", "Salt bin refill"],
     asset_item: 'grit bin'
@@ -106,24 +102,20 @@ var streetlight_code_to_type = {
 var labeled_defaults = $.extend(true, {}, defaults, {
     select_action: true,
     stylemap: streetlight_stylemap,
-    attributes: {
-        central_asset_id: 'central_as',
-        site_code: 'site_code'
-    },
     feature_code: 'feature_id',
     actions: {
-        asset_found: function(asset, config) {
-          var id = asset.attributes[config.feature_code] || '';
+        asset_found: function(asset) {
+          var id = asset.attributes[this.fixmystreet.feature_code] || '';
           if (id !== '') {
               var code = id.replace(/[0-9]/g, '');
-              var asset_name = streetlight_code_to_type[code] || config.asset_item;
+              var asset_name = streetlight_code_to_type[code] || this.fixmystreet.asset_item;
               $('.category_meta_message').html('You have selected ' + asset_name + ' <b>' + id + '</b>');
           } else {
-              $('.category_meta_message').html('You can pick a <b class="asset-spot">' + config.asset_item + '</b> from the map &raquo;');
+              $('.category_meta_message').html('You can pick a <b class="asset-spot">' + this.fixmystreet.asset_item + '</b> from the map &raquo;');
           }
         },
-        asset_not_found: function(config) {
-           $('.category_meta_message').html('You can pick a <b class="asset-spot">' + config.asset_item + '</b> from the map &raquo;');
+        asset_not_found: function() {
+           $('.category_meta_message').html('You can pick a <b class="asset-spot">' + this.fixmystreet.asset_item + '</b> from the map &raquo;');
         }
     }
 });
@@ -169,9 +161,6 @@ fixmystreet.assets.add($.extend(true, {}, labeled_defaults, {
             TYPENAME: "Beacons"
         }
     },
-    attributes: {
-        central_asset_id: 'central_as',
-    },
     asset_category: [
           'Belisha Beacon broken',
         ],
@@ -185,9 +174,6 @@ fixmystreet.assets.add($.extend(true, {}, labeled_defaults, {
             TYPENAME: "Beacon_Column"
         }
     },
-    attributes: {
-        central_asset_id: 'central_as',
-    },
     asset_category: [
           'Belisha Beacon broken',
         ],
@@ -200,9 +186,6 @@ fixmystreet.assets.add($.extend(true, {}, labeled_defaults, {
         params: {
             TYPENAME: "Crossings"
         }
-    },
-    attributes: {
-        central_asset_id: 'central_as',
     },
     feature_code: 'asset_no',
     asset_category: [
@@ -218,9 +201,6 @@ fixmystreet.assets.add($.extend(true, {}, labeled_defaults, {
             TYPENAME: "Signs_Union"
         }
     },
-    attributes: {
-        central_asset_id: 'central_as',
-    },
     asset_category: [
           'Sign light not working',
           'Sign problem',
@@ -233,9 +213,6 @@ fixmystreet.assets.add($.extend(true, {}, defaults, {
         params: {
             TYPENAME: "Gullies"
         }
-    },
-    attributes: {
-        central_asset_id: 'central_as',
     },
     asset_category: [
         'Blocked drain'
@@ -488,5 +465,27 @@ fixmystreet.assets.add($.extend(true, {}, defaults, {
     }
 }));
 
+function check_rights_of_way() {
+    var relevant_body = OpenLayers.Util.indexOf(fixmystreet.bodies, defaults.body) > -1;
+    var relevant_cat = $('#form_category').val() == 'Rights of Way';
+    var relevant = relevant_body && relevant_cat;
+    var currently_shown = !!$('#row-message').length;
+
+    if (relevant === currently_shown) {
+        // Either should be shown and already is, or shouldn't be shown and isn't
+        return;
+    }
+
+    if (!relevant) {
+        $('#row-message').remove();
+        $('.js-hide-if-invalid-category').show();
+        return;
+    }
+
+    var $msg = $('<p id="row-message" class="box-warning">If you wish to report an issue on a Public Right of Way, please use <a href="https://www.buckscc.gov.uk/services/environment/public-rights-of-way/report-a-rights-of-way-issue/">this service</a>.</p>');
+    $msg.insertBefore('#js-post-category-messages');
+    $('.js-hide-if-invalid-category').hide();
+}
+$(fixmystreet).on('report_new:category_change', check_rights_of_way);
 
 })();

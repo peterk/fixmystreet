@@ -8,7 +8,6 @@ use DateTime::Format::Pg;
 
 use Utils;
 use Utils::OpenStreetMap;
-use mySociety::MaPit;
 
 use FixMyStreet;
 use FixMyStreet::Cobrand;
@@ -127,10 +126,19 @@ sub send(;$) {
             $missing = join(' / ', @missing) if @missing;
         }
 
+        my $send_confirmation_email = $cobrand->report_sent_confirmation_email;
+
         my @dear;
         my %reporters = ();
         my $skip = 0;
         while (my $body = $bodies->next) {
+            # See if this body wants confirmation email (in case report made on national site, for example)
+            if (my $cobrand_body = $body->get_cobrand_handler) {
+                if (my $id_ref = $cobrand_body->report_sent_confirmation_email) {
+                    $send_confirmation_email = $id_ref;
+                }
+            }
+
             my $sender_info = $cobrand->get_body_sender( $body, $row->category );
             my $sender = "FixMyStreet::SendReport::" . $sender_info->{method};
 
@@ -243,7 +251,8 @@ sub send(;$) {
                 whensent => \'current_timestamp',
                 lastupdate => \'current_timestamp',
             } );
-            if ( $cobrand->report_sent_confirmation_email && !$h{anonymous_report}) {
+            if ($send_confirmation_email && !$h{anonymous_report}) {
+                $h{sent_confirm_id_ref} = $row->$send_confirmation_email;
                 _send_report_sent_email( $row, \%h, $nomail, $cobrand );
             }
             debug_print("send successful: OK", $row->id) if $debug_mode;
@@ -283,7 +292,7 @@ sub send(;$) {
         } );
         while (my $row = $unsent->next) {
             my $base_url = FixMyStreet->config('BASE_URL');
-            $sending_errors .= "* " . $base_url . "/report/" . $row->id . ", failed "
+            $sending_errors .= "\n" . '=' x 80 . "\n\n" . "* " . $base_url . "/report/" . $row->id . ", failed "
                 . $row->send_fail_count . " times, last at " . $row->send_fail_timestamp
                 . ", reason " . $row->send_fail_reason . "\n";
         }

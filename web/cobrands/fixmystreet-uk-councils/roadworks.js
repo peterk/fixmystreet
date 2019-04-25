@@ -131,6 +131,7 @@ var roadworks_defaults = {
             params.filterstartdate = format_date(date);
             date.setMonth(date.getMonth() + 3);
             params.filterenddate = format_date(date);
+            params.mapzoom = fixmystreet.map.getZoom() + fixmystreet.zoomOffset;
             return params;
         }
     },
@@ -139,7 +140,22 @@ var roadworks_defaults = {
     stylemap: stylemap,
     body: "", // Cobrand JS should extend and override this.
     non_interactive: true,
-    always_visible: true
+    always_visible: true,
+    nearest_radius: 100,
+    road: true,
+    all_categories: true,
+    actions: {
+        found: function(layer, feature) {
+            $(".js-roadworks-message-" + layer.id).remove();
+            if (!fixmystreet.roadworks.filter || fixmystreet.roadworks.filter(feature)) {
+                fixmystreet.roadworks.display_message(feature);
+                return true;
+            }
+        },
+        not_found: function(layer) {
+            $(".js-roadworks-message-" + layer.id).remove();
+        }
+    }
 };
 
 fixmystreet.roadworks = {};
@@ -154,41 +170,46 @@ fixmystreet.roadworks.layer_future = $.extend(true, {}, roadworks_defaults, {
 
 // fixmystreet.map.layers[5].getNearestFeature(new OpenLayers.Geometry.Point(-0.835614, 51.816562).transform(new OpenLayers.Projection("EPSG:4326"), new OpenLayers.Projection("EPSG:3857")), 10)
 
-fixmystreet.roadworks.show_nearby = function(evt, lonlat) {
-    $(".js-roadworks-message").remove();
-    var providers = fixmystreet.map.getLayersBy('fixmystreet', {
-        test: function(options) {
-            return options && options.format_class == OpenLayers.Format.RoadworksForwardPlanning;
-        }
-    });
-    for (var i=0; i<providers.length; i++) {
-        var layer = providers[i];
-        var point = new OpenLayers.Geometry.Point(lonlat.lon, lonlat.lat);
-        var feature = layer.getFeatureAtPoint(point);
-        if (feature == null) {
-            // The click wasn't directly over a road, try and find one nearby
-            feature = layer.getNearestFeature(point, 100);
-        }
-        if (feature !== null && fixmystreet.roadworks.filter(feature)) {
-            fixmystreet.roadworks.display_message(feature);
-            return true;
-        }
-    }
-};
-
-fixmystreet.roadworks.filter = function() {
-    return 1;
-};
+fixmystreet.roadworks.config = {};
 
 fixmystreet.roadworks.display_message = function(feature) {
     var attr = feature.attributes,
-        start = attr.start.replace(/{ts '([^ ]*).*/, '$1'),
-        end = attr.end.replace(/{ts '([^ ]*).*/, '$1'),
-        tooltip = attr.tooltip.replace(/\\n/g, '\n');
-    $('.change_location').after('<div class="js-roadworks-message box-warning">Roadworks are scheduled near this location from ' + start + ' to ' + end + ', so you may not need to report your issue: “' + tooltip + '”</div>');
-};
+        start = new Date(attr.start.replace(/{ts '([^ ]*).*/, '$1')).toDateString(),
+        end = new Date(attr.end.replace(/{ts '([^ ]*).*/, '$1')).toDateString(),
+        tooltip = attr.tooltip.replace(/\\n/g, '\n'),
+        desc = attr.works_desc.replace(/\\n/g, '\n');
 
-$(fixmystreet).on('maps:update_pin', fixmystreet.roadworks.show_nearby);
+    var config = this.config,
+        tag_top = config.tag_top || 'p',
+        colon = config.colon ? ':' : '';
+
+        var $msg = $('<div class="js-roadworks-message-' + feature.layer.id + ' box-warning"><' + tag_top + '>Roadworks are scheduled near this location, so you may not need to report your issue.</' + tag_top + '></div>');
+        var $dl = $("<dl></dl>").appendTo($msg);
+        $dl.append("<dt>Dates" + colon + "</dt>");
+        $dl.append($("<dd></dd>").text(start + " until " + end));
+        $dl.append("<dt>Summary" + colon + "</dt>");
+        var $summary = $("<dd></dd>").appendTo($dl);
+        tooltip.split("\n").forEach(function(para) {
+            if (para.match(/^(\d{2}\s+\w{3}\s+(\d{2}:\d{2}\s+)?\d{4}( - )?){2}/)) {
+                // skip showing the date again
+                return;
+            }
+            if (config.skip_delays && para.match(/^delays/)) {
+                // skip showing traffic delay information
+                return;
+            }
+            $summary.append(para).append("<br />");
+        });
+        if (desc) {
+            $dl.append("<dt>Description" + colon + "</dt>");
+            $dl.append($("<dd></dd>").text(desc));
+        }
+        if (config.text_after) {
+            $dl.append(config.text_after);
+        }
+
+    $msg.prependTo('#js-post-category-messages');
+};
 
 /* Stop sending a needless header so that no preflight CORS request */
 OpenLayers.Request.XMLHttpRequest.prototype.setRequestHeader = function(sName, sValue) {

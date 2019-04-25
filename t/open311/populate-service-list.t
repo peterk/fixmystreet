@@ -19,6 +19,7 @@ package main;
 
 use FixMyStreet::Test;
 use FixMyStreet::DB;
+use utf8;
 
 use_ok( 'Open311::PopulateServiceList' );
 use_ok( 'Open311' );
@@ -297,6 +298,47 @@ for my $test (
         ',
     },
     {
+        desc => 'check meta data unchanging',
+        has_meta => 1,
+        has_no_history => 1,
+        orig_meta => [ {
+            variable => 'true',
+            code => 'type',
+            datatype => 'string',
+            required => 'true',
+            datatype_description => 'Colour of bin',
+            order => 1,
+            description => 'Cólour of bin'
+
+        } ],
+        end_meta => [ {
+            variable => 'true',
+            code => 'type',
+            datatype => 'string',
+            required => 'true',
+            datatype_description => 'Colour of bin',
+            order => 1,
+            description => 'Cólour of bin'
+
+        } ],
+        meta_xml => '<?xml version="1.0" encoding="utf-8"?>
+    <service_definition>
+        <service_code>100</service_code>
+        <attributes>
+            <attribute>
+                <variable>true</variable>
+                <code>type</code>
+                <datatype>string</datatype>
+                <required>true</required>
+                <datatype_description>Colour of bin</datatype_description>
+                <order>1</order>
+                <description>Cólour of bin</description>
+            </attribute>
+        </attributes>
+    </service_definition>
+        ',
+    },
+    {
         desc => 'check meta data removed',
         has_meta => 0,
         end_meta => [],
@@ -389,11 +431,21 @@ for my $test (
         $processor->_current_open311( $o );
         $processor->_current_body( $body );
 
+        my $count = FixMyStreet::DB->resultset('ContactsHistory')->search({
+            contact_id => $contact->id,
+        })->count;
+
         $processor->process_services( $service_list );
 
         $contact->discard_changes;
 
         is_deeply $contact->get_extra_fields, $test->{end_meta}, 'meta data saved';
+
+        if ($test->{has_no_history}) {
+            is +FixMyStreet::DB->resultset('ContactsHistory')->search({
+                contact_id => $contact->id,
+            })->count, $count, 'No new history';
+        }
     };
 }
 
@@ -532,6 +584,15 @@ subtest 'check Bromley skip code' => sub {
             <order>1</order>
             <description>Type of bin</description>
         </attribute>
+        <attribute>
+            <variable>true</variable>
+            <code>easting</code>
+            <datatype>string</datatype>
+            <required>true</required>
+            <datatype_description>String</datatype_description>
+            <order>1</order>
+            <description>Easting</description>
+        </attribute>
     </attributes>
 </service_definition>
     ';
@@ -573,6 +634,15 @@ subtest 'check Bromley skip code' => sub {
             datatype_description => 'Type of bin',
             order => 1,
             description => 'Type of bin'
+    }, {
+            automated => 'server_set',
+            variable => 'true',
+            code => 'easting',
+            datatype => 'string',
+            required => 'true',
+            datatype_description => 'String',
+            order => 1,
+            description => 'Easting',
     }, {
             automated => 'hidden_field',
             variable => 'true',
@@ -619,7 +689,14 @@ subtest 'check Bromley skip code' => sub {
             datatype_description => 'Type of bin',
             order => 1,
             description => 'Type of bin'
-
+        }, {
+            variable => 'true',
+            code => 'easting',
+            datatype => 'string',
+            required => 'true',
+            datatype_description => 'String',
+            order => 1,
+            description => 'Easting',
         },
     ];
 

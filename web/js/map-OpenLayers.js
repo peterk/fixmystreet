@@ -381,15 +381,15 @@ $.extend(fixmystreet.utils, {
 
     function sidebar_highlight(problem_id) {
         if (typeof problem_id !== 'undefined') {
-            var $a = $('.item-list--reports a[href$="/' + problem_id + '"]');
-            $a.parent().addClass('hovered');
+            var $li = $('[data-report-id="' + problem_id + '"]');
+            $li.addClass('hovered');
         } else {
-            $('.item-list--reports .hovered').removeClass('hovered');
+            $('.item-list .hovered').removeClass('hovered');
         }
     }
 
     function marker_click(problem_id, evt) {
-        var $a = $('.item-list--reports a[href$="/' + problem_id + '"]');
+        var $a = $('.item-list a[href$="/' + problem_id + '"]');
         if (!$a[0]) {
             return;
         }
@@ -1055,6 +1055,13 @@ OpenLayers.Strategy.FixMyStreetFixed = OpenLayers.Class(OpenLayers.Strategy.Fixe
 // is dragged (modulo a buffer extending outside the viewport).
 // This subclass is required so we can pass the 'filter_category' and 'status' query
 // params to /around?ajax if the user has filtered the map.
+
+fixmystreet.protocol_params = {
+    filter_category: 'filter_categories',
+    status: 'statuses',
+    sort: 'sort'
+};
+
 OpenLayers.Protocol.FixMyStreet = OpenLayers.Class(OpenLayers.Protocol.HTTP, {
     initial_page: null,
     use_page: false,
@@ -1062,7 +1069,7 @@ OpenLayers.Protocol.FixMyStreet = OpenLayers.Class(OpenLayers.Protocol.HTTP, {
     read: function(options) {
         // Pass the values of the category, status, and sort fields as query params
         options.params = options.params || {};
-        $.each({ filter_category: 'filter_categories', status: 'statuses', sort: 'sort' }, function(key, id) {
+        $.each(fixmystreet.protocol_params, function(key, id) {
             var val = $('#' + id).val();
             if (val && val.length) {
                 options.params[key] = val.join ? fixmystreet.utils.array_to_csv_line(val) : val;

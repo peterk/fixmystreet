@@ -200,6 +200,11 @@ body.mappage {
 //  }
 }
 
+.box-warning,
+.extra-category-questions {
+  margin: 1em ($mappage-sidebar-padding * -1);
+}
+
 // Want to cover over the blue sidebar
 body.mappage.admin {
     .full-width--top {
@@ -267,19 +272,6 @@ body.mappage.admin {
     @media (max-width: 79em) {
       width: $mappage-sidebar-width--medium + $mappage-actions-width--medium;
     }
-  }
-
-  // Chrome/Safari count padding-bottom as part of the scrollable content in
-  // an overflow:scroll element (technically in contravention of the spec),
-  // whereas Firefox/IE render the padding outside the scrollable area.
-  // We need padding at the bottom of the sidebar, to stop .shadow-wrap from
-  // obscuring content at the bottom of the sidebar. So we use an :after
-  // pseudo-element instead of padding.
-  // https://bugzilla.mozilla.org/show_bug.cgi?id=748518
-  &:after {
-    content: "";
-    display: block;
-    height: 4em;
   }
 }
 
@@ -848,6 +840,9 @@ textarea.form-error {
     margin-#{$right}: 0.5em;
     label {
       margin:0.5em 0;
+    }
+    .form-hint {
+        margin-top: -0.25em;
     }
     div {
       display:block;

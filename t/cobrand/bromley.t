@@ -192,7 +192,7 @@ subtest 'check display of TfL reports' => sub {
         $mech->follow_link_ok({ text_regex => qr/Back to all reports/i });
     };
     $mech->content_like(qr{<a title="TfL Test[^>]*www.example.org[^>]*><img[^>]*grey});
-    $mech->content_like(qr{<a title="Test Test[^>]*bromley.example.org[^>]*><img[^>]*yellow});
+    $mech->content_like(qr{<a title="Test Test[^>]*href="/[^>]*><img[^>]*yellow});
 };
 
 subtest 'check geolocation overrides' => sub {
@@ -220,12 +220,24 @@ subtest 'check special subcategories in admin' => sub {
         ALLOWED_COBRANDS => 'bromley',
         MAPIT_URL => 'http://mapit.uk/',
     }, sub {
-        $mech->get_ok('/admin/user_edit/' . $user->id);
+        $mech->get_ok('/admin/users/' . $user->id);
         $mech->submit_form_ok({ with_fields => { 'contacts['.$contact->id.']' => 1, 'contacts[BLUE]' => 1 } });
     };
     $user->discard_changes;
     is_deeply $user->get_extra_metadata('categories'), [ $contact->id ];
     is_deeply $user->get_extra_metadata('subcategories'), [ 'BLUE' ];
+};
+
+subtest 'check heatmap page' => sub {
+    $user->update({ area_ids => [ 60705 ] });
+    FixMyStreet::override_config {
+        ALLOWED_COBRANDS => 'bromley',
+        MAPIT_URL => 'http://mapit.uk/',
+    }, sub {
+        $mech->log_in_ok($user->email);
+        $mech->get_ok('/about/heatmap?end_date=2018-12-31');
+        $mech->get_ok('/about/heatmap?filter_category=RED&ajax=1');
+    };
 };
 
 done_testing();

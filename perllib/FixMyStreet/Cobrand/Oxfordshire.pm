@@ -21,8 +21,8 @@ sub report_validation {
         $errors->{name} = sprintf( 'Names are limited to %d characters in length.', 50 );
     }
 
-    if ( length( $report->user->phone ) > 30 ) {
-        $errors->{phone} = sprintf( 'Phone numbers are limited to %s characters in length.', 30 );
+    if ( length( $report->user->phone ) > 20 ) {
+        $errors->{phone} = sprintf( 'Phone numbers are limited to %s characters in length.', 20 );
     }
 
     if ( length( $report->user->email ) > 50 ) {
@@ -72,8 +72,6 @@ sub default_map_zoom { return 3; }
 
 # let staff hide OCC reports
 sub users_can_hide { return 1; }
-
-sub default_show_name { 0 }
 
 sub lookup_by_ref_regex {
     return qr/^\s*((?:ENQ)?\d+)\s*$/;
@@ -180,13 +178,11 @@ sub open311_config {
 
     my $extra = $row->get_extra_fields;
     push @$extra, { name => 'external_id', value => $row->id };
+    push @$extra, { name => 'northing', value => $h->{northing} };
+    push @$extra, { name => 'easting', value => $h->{easting} };
 
     if ($h->{closest_address}) {
         push @$extra, { name => 'closest_address', value => "$h->{closest_address}" }
-    }
-    if ( $row->used_map || ( !$row->used_map && !$row->postcode ) ) {
-        push @$extra, { name => 'northing', value => $h->{northing} };
-        push @$extra, { name => 'easting', value => $h->{easting} };
     }
     $row->set_extra_fields( @$extra );
 

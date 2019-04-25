@@ -38,10 +38,16 @@ body_validation_rules = {
           maxlength: 50
         },
         phone: {
-          maxlength: 30
+          maxlength: 20
         },
         email: {
           maxlength: 50
+        }
+    },
+    'Northamptonshire County Council': {
+        title: {
+          required: true,
+          maxlength: 120
         }
     }
 };

@@ -1,8 +1,14 @@
 ## Releases
 
 * Unreleased
+    - New features:
+        - (Optional) auto-suggestion of similar nearby problems,
+          while reporting, to discourage duplicate reports. #2386
     - Front end improvements:
         - Track map state in URL to make sharing links easier. #2242
+        - Default to unchecked for show name checkbox. #347
+    - Email improvements:
+        - Header image file name can be customised
     - Admin improvements:
         - Include moderation history in report updates. #2379
         - Allow moderation to potentially change state. #2381
@@ -15,13 +21,36 @@
         - Delete cache photos upon photo moderation. #2374
         - Remove any use of `my $x if $foo`. #2377
         - Fix saving of inspect form data offline.
-        - Add CSRF and time to contact form.
-        - Make sure admin metadata dropdown index numbers are updated too.
-        - Fix issue with Open311 codes starting with ‘_’.
-        - Add parameter to URL when “Show older” clicked.
+        - Add CSRF and time to contact form. #2388
+        - Make sure admin metadata dropdown index numbers are updated too. #2369
+        - Fix issue with Open311 codes starting with ‘_’. #2391
+        - Add parameter to URL when “Show older” clicked. #2397
+        - Don't ask for email on alert signup if logged in. #2402
+        - Filter out hidden reports from top 5 list. #1957
+        - Add space below "map page" contents on narrow screens.
+        - Use relative report links where possible. #1995
+        - Improve inline checkbox spacing. #2411
+        - Prevent duplicate contact history creation with Unicode data.
+        - Show all Open311 extra fields in edit admin.
+        - Proper bodies check for sending updates.
+        - Check better if extra question has values.
+        - Stop filter category overriding chosen category.
+        - Allow things to reset if "Pick a category" picked.
+        - Stop category_change firing more than it should.
+        - Fix extra question display when only one category.
+        - Fix superusers creating anonymous reports. #2435
+        - Ensure non_public reports aren't exposed at /open311 endpoint.
+        - Escape body name in admin title.
+        - Use REQUEST_URI, not PATH_INFO, to infer path.
     - Development improvements:
         - Make front page cache time configurable.
         - Better working of /fakemapit/ under https.
+        - Improve Open311 error output on failing GET requests.
+    - Backwards incompatible changes:
+        - If you wish the default for the showname checkbox to be checked,
+          add `sub default_show_name { 1 }` to your cobrand file.
+        - The admin body and user sections have been refactored – if you have
+          custom templates/code, you may need to update links to those.
 
 * v2.5 (21st December 2018)
     - Front end improvements:

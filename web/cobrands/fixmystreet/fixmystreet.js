@@ -378,8 +378,8 @@ $.extend(fixmystreet.set_up, {
 	// /report/new), fetch it first. That will then automatically call this
 	// function again, due to it calling change() on the category if set.
         if (!fixmystreet.reporting_data) {
-            if (fixmystreet.map) {
-                fixmystreet.update_pin(fixmystreet.map.getCenter(), false);
+            if (fixmystreet.page === 'new') {
+                fixmystreet.fetch_reporting_data();
             }
             return;
         }
@@ -388,23 +388,22 @@ $.extend(fixmystreet.set_up, {
             data = fixmystreet.reporting_data.by_category[category],
             $category_meta = $('#category_meta');
 
-        if (!data) {
-            // The Pick a category option, or something gone wrong
-            return;
+        if (data) {
+            fixmystreet.bodies = data.bodies || [];
+        } else {
+            fixmystreet.bodies = fixmystreet.reporting_data.bodies || [];
         }
-
-        fixmystreet.bodies = data.bodies || [];
         if (fixmystreet.body_overrides) {
             fixmystreet.body_overrides.clear();
         }
 
-        if (data.councils_text) {
+        if (data && data.councils_text) {
             fixmystreet.update_councils_text(data);
         } else {
             // Use the original returned texts
             fixmystreet.update_councils_text(fixmystreet.reporting_data);
         }
-        if ( data.category_extra ) {
+        if (data && data.category_extra) {
             if ( $category_meta.length ) {
                 $category_meta.replaceWith( data.category_extra );
                 // Preserve any existing values
@@ -412,7 +411,7 @@ $.extend(fixmystreet.set_up, {
                     $category_meta.find("[name="+this.name+"]").val(this.value);
                 });
             } else {
-                $('#form_category_row').after( data.category_extra );
+                $('#js-post-category-messages').prepend( data.category_extra );
             }
         } else {
             $category_meta.empty();
@@ -428,7 +427,7 @@ $.extend(fixmystreet.set_up, {
         });
         // apply new validation rules
         fixmystreet.set_up.reapply_validation(core_validation_rules);
-        $.each(data.bodies, function(index, body) {
+        $.each(fixmystreet.bodies, function(index, body) {
             if ( typeof body_validation_rules !== 'undefined' && body_validation_rules[body] ) {
                 var rules = body_validation_rules[body];
                 fixmystreet.set_up.reapply_validation(rules);
@@ -447,15 +446,24 @@ $.extend(fixmystreet.set_up, {
             var $el = $('#form_' + name);
             if ($el.length) {
                 $el.rules('add', rule);
+                if (rule.maxlength) {
+                  $el.attr('maxlength', rule.maxlength);
+                } else {
+                  $el.removeAttr('maxlength');
+                }
             }
         });
   },
 
-  category_groups: function() {
-    var $category_select = $("select#form_category.js-grouped-select");
-    if ($category_select.length === 0) {
+  category_groups: function(old_group) {
+    var $category_select = $("select#form_category");
+    if (!$category_select.hasClass('js-grouped-select')) {
+        if ($category_select.val() !== '-- Pick a category --') {
+            $category_select.change();
+        }
         return;
     }
+
     var $group_select = $("<select></select>").addClass("form-control validCategory").attr('id', 'category_group');
     var $subcategory_label = $("#form_subcategory_label");
     var $empty_option = $category_select.find("option").first();
@@ -531,6 +539,10 @@ $.extend(fixmystreet.set_up, {
         }
         return a.label > b.label ? 1 : -1;
     }).appendTo($group_select);
+
+    if (old_group !== '-- Pick a category --' && $category_select.val() == '-- Pick a category --') {
+        $group_select.val(old_group);
+    }
     $group_select.change();
   },
 
@@ -974,7 +986,7 @@ $.extend(fixmystreet.set_up, {
         e.preventDefault();
         var form = $('<form/>').attr({ method:'post', action:"/alert/subscribe" });
         form.append($('<input name="alert" value="Subscribe me to an email alert" type="hidden" />'));
-        $('#alerts input[type=text], #alerts input[type=hidden], #alerts input[type=radio]:checked').each(function() {
+        $(this).closest('.js-alert-list').find('input[type=email], input[type=text], input[type=hidden], input[type=radio]:checked').each(function() {
             var $v = $(this);
             $('<input/>').attr({ name:$v.attr('name'), value:$v.val(), type:'hidden' }).appendTo(form);
         });
@@ -1049,6 +1061,32 @@ $.extend(fixmystreet.set_up, {
         var set_map_state = true;
         fixmystreet.back_to_reports_list(e, report_list_url, map_state, set_map_state);
     });
+  },
+
+  expandable_list_items: function(){
+      $(document).on('click', '.js-toggle-expansion', function(e) {
+          e.preventDefault(); // eg: prevent button from submitting parent form
+          var $toggle = $(this);
+          var $parent = $toggle.closest('.js-expandable');
+          $parent.toggleClass('expanded');
+          $toggle.text($parent.hasClass('expanded') ? $toggle.data('less') : $toggle.data('more'));
+      });
+
+      $(document).on('click', '.js-expandable', function(e) {
+          var $parent = $(this);
+          // Ignore parents that are already expanded.
+          if ( ! $parent.hasClass('expanded') ) {
+              // Ignore clicks on action buttons (clicks on the
+              // .js-toggle-expansion button will be handled by
+              // the more specific handler above).
+              if ( ! $(e.target).is('.item-list__item--expandable__actions *') ) {
+                  e.preventDefault();
+                  $parent.addClass('expanded');
+                  var $toggle = $parent.find('.js-toggle-expansion');
+                  $toggle.text($toggle.data('less'));
+              }
+          }
+      });
   }
 
 });
@@ -1129,6 +1167,15 @@ fixmystreet.update_pin = function(lonlat, savePushState) {
         }
     }
 
+    fixmystreet.fetch_reporting_data();
+
+    if (!$('#side-form-error').is(':visible')) {
+        $('#side-form').show();
+        $('#map_sidebar').scrollTop(0);
+    }
+};
+
+fixmystreet.fetch_reporting_data = function() {
     $.getJSON('/report/new/ajax', {
         latitude: $('#fixmystreet\\.latitude').val(),
         longitude: $('#fixmystreet\\.longitude').val()
@@ -1142,18 +1189,28 @@ fixmystreet.update_pin = function(lonlat, savePushState) {
             $('body').removeClass('with-notes');
             return;
         }
-        $('#side-form, #site-logo').show();
-        var category_group = $('#category_group').val(),
-          old_category = $("select#form_category").val();
+        $('#side-form').show();
+        var old_category_group = $('#category_group').val(),
+            old_category = $("#form_category").val(),
+            filter_category = $("#filter_categories").val();
 
         fixmystreet.reporting_data = data;
 
         fixmystreet.update_councils_text(data);
         $('#js-top-message').html(data.top_message || '');
+
         $('#form_category_row').html(data.category);
-        if ($("select#form_category option[value=\""+old_category+"\"]").length) {
-            $("select#form_category").val(old_category);
+        if ($("#form_category option[value=\"" + old_category + "\"]").length) {
+            $("#form_category").val(old_category);
+        } else if (filter_category !== undefined && $("#form_category option[value='" + filter_category + "']").length) {
+            // If the category filter appears on the map and the user has selected
+            // something from it, then pre-fill the category field in the report,
+            // if it's a value already present in the drop-down.
+            $("#form_category").val(filter_category);
         }
+
+        fixmystreet.set_up.category_groups(old_category_group);
+
         if ( data.extra_name_info && !$('#form_fms_extra_title').length ) {
             // there might be a first name field on some cobrands
             var lb = $('#form_first_name').prev();
@@ -1164,23 +1221,6 @@ fixmystreet.update_pin = function(lonlat, savePushState) {
         fixmystreet.bodies = data.bodies || [];
         if (fixmystreet.body_overrides) {
             fixmystreet.body_overrides.clear();
-        }
-
-        // If the category filter appears on the map and the user has selected
-        // something from it, then pre-fill the category field in the report,
-        // if it's a value already present in the drop-down.
-        var category = $("#filter_categories").val();
-        if (category !== undefined && $("#form_category option[value='"+category+"']").length) {
-            $("#form_category").val(category);
-        }
-
-        var category_select = $("select#form_category");
-        if (category_select.val() != '-- Pick a category --') {
-            category_select.change();
-        }
-        fixmystreet.set_up.category_groups();
-        if (category_group !== '-- Pick a category --' && category_select.val() == '-- Pick a category --') {
-            $('#category_group').val(category_group).change();
         }
 
         if (data.contribute_as) {
@@ -1204,12 +1244,6 @@ fixmystreet.update_pin = function(lonlat, savePushState) {
             $('#js-contribute-as-wrapper').hide();
         }
     });
-
-    if (!$('#side-form-error').is(':visible')) {
-        $('#side-form, #site-logo').show();
-        $('#map_sidebar').scrollTop(0);
-    }
-
 };
 
 fixmystreet.display = {
