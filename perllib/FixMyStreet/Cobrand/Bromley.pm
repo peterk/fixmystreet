@@ -14,6 +14,8 @@ sub council_area { return 'Bromley'; }
 sub council_name { return 'Bromley Council'; }
 sub council_url { return 'bromley'; }
 
+sub suggest_duplicates { 1 }
+
 sub report_validation {
     my ($self, $report, $errors) = @_;
 
@@ -430,7 +432,7 @@ sub munge_load_and_group_problems {
     my $params = { map { my $n = $_; s/me\./problem\./; $_ => $where->{$n} } keys %$where };
     my @c = $c->model('DB::Comment')->to_body($self->body)->search({
         %$params,
-        'me.user_id' => { -not_in => [ $c->user->id, $self->body->comment_user_id ] },
+        'me.user_id' => { -not_in => [ $c->user->id, $self->body->comment_user_id || () ] },
         'me.state' => 'confirmed',
     }, {
         columns => 'problem_id',

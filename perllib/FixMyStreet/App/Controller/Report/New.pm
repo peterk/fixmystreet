@@ -757,7 +757,7 @@ sub setup_report_extra_fields : Private {
 
     return unless $c->cobrand->allow_report_extra_fields;
 
-    my @extras = $c->model('DB::ReportExtraFields')->for_cobrand($c->cobrand)->for_language($c->stash->{lang_code})->all;
+    my @extras = $c->model('DB::ReportExtraField')->for_cobrand($c->cobrand)->for_language($c->stash->{lang_code})->all;
     $c->stash->{report_extra_fields} = \@extras;
 }
 
@@ -1578,9 +1578,9 @@ sub generate_category_extra_json : Private {
     my @fields = map {
         {
             %$_,
-            required => $_->{required} eq "true" ? $true : $false,
-            variable => $_->{variable} eq "true" ? $true : $false,
-            order => int($_->{order}),
+            required => ($_->{required} || '') eq "true" ? $true : $false,
+            variable => ($_->{variable} || '') eq "true" ? $true : $false,
+            order => int($_->{order} || 0),
         }
     } @{ $c->stash->{category_extras}->{$c->stash->{category}} };
 

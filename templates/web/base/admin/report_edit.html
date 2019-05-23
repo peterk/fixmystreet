@@ -47,7 +47,7 @@ class="admin-offsite-link">[% problem.latitude %], [% problem.longitude %]</a>
 [% END %]
 
 <small>([%
-    SET postcode_safe = problem.postcode | html;
+    postcode_safe = problem.postcode | html;
     tprintf( loc('originally entered: &ldquo;%s&rdquo;'), postcode_safe )
 %],
 [% IF problem.used_map %][% loc('used map') %][% ELSE %][% loc("didn't use map") %][% END %])</small>
@@ -87,6 +87,11 @@ class="admin-offsite-link">[% problem.latitude %], [% problem.longitude %]</a>
     <input type="submit" class="btn" name="mark_sent" value="[% loc('Mark as sent') %]">
   [% END %]
 </li>
+[% IF c.user.is_superuser AND problem.send_fail_count > 0 %]
+<li class="sm">[% loc('Send Fail Count:') %] [% problem.send_fail_count %]</li>
+<li class="sm">[% loc('Last failure:') %] [% PROCESS format_time time=problem.send_fail_timestamp %]</li>
+<li class="sm truncate_height">[% loc('Reason:') %] [% problem.send_fail_reason | html %]</li>
+[% END %]
 <li class="sm">[% loc('Last update:') %] [% PROCESS format_time time=problem.lastupdate %]</li>
 <li>[% loc('Alerts:') %] [% alert_count %]</li>
 <li>[% loc('Service:') %] [% problem.service OR '<em>' _ loc('None') _ '</em>' %]</li>

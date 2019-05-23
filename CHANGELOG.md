@@ -1,6 +1,13 @@
 ## Releases
 
 * Unreleased
+    - Bugfixes:
+        - Prevent creation of two templates with same title.
+        - Fix bug going between report/new pages client side
+    - Development improvements:
+        - Upgrade the underlying framework and a number of other packages.
+
+* v2.6 (3rd May 2019)
     - New features:
         - (Optional) auto-suggestion of similar nearby problems,
           while reporting, to discourage duplicate reports. #2386
@@ -16,6 +23,7 @@
         - Allow searching for <email> in admin.
         - Make staff JavaScript more self-contained.
         - Alow staff user to be associated with multiple areas.
+        - Improvements to admin checkbox display.
     - Bugfixes:
         - Check cached reports do still have photos before being shown. #2374
         - Delete cache photos upon photo moderation. #2374

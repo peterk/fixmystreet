@@ -535,8 +535,8 @@ sub report_edit : Path('report_edit') : Args(1) {
             $self->remove_photo($c, $problem, $remove_photo_param);
         }
 
-        if ($problem->state eq 'hidden') {
-            $problem->get_photoset->delete_cached;
+        if ($problem->state eq 'hidden' || $problem->non_public) {
+            $problem->get_photoset->delete_cached(plus_updates => 1);
         }
 
         if ( $problem->is_visible() and $old_state eq 'unconfirmed' ) {
@@ -782,6 +782,15 @@ sub template_edit : Path('templates') : Args(2) {
             }
 
             $template->title( $c->get_param('title') );
+            my $query = { title => $template->title };
+            if ($template->in_storage) {
+                $query->{id} = { '!=', $template->id };
+            }
+            if ($c->stash->{body}->response_templates->search($query)->count) {
+                $c->stash->{errors} ||= {};
+                $c->stash->{errors}->{title} = _("There is already a template with that title.");
+            }
+
             $template->text( $c->get_param('text') );
             $template->state( $c->get_param('state') );
             $template->external_status_code( $c->get_param('external_status_code') );

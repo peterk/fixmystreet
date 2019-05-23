@@ -12,6 +12,7 @@ use_ok( 'Open311' );
 use_ok( 'Open311::GetServiceRequestUpdates' );
 use DateTime;
 use DateTime::Format::W3CDTF;
+use File::Temp 'tempdir';
 use FixMyStreet::DB;
 
 my $user = FixMyStreet::DB->resultset('User')->find_or_create(
@@ -508,6 +509,13 @@ for my $test (
 }
 
 subtest 'Update with media_url includes image in update' => sub {
+  my $UPLOAD_DIR = tempdir( CLEANUP => 1 );
+  FixMyStreet::override_config {
+    PHOTO_STORAGE_BACKEND => 'FileSystem',
+    PHOTO_STORAGE_OPTIONS => {
+        UPLOAD_DIR => $UPLOAD_DIR,
+    },
+  }, sub {
     my $guard = LWP::Protocol::PSGI->register(t::Mock::Static->to_psgi_app, host => 'example.com');
 
     my $local_requests_xml = setup_xml($problem->external_id, 1, "");
@@ -527,6 +535,7 @@ subtest 'Update with media_url includes image in update' => sub {
     is $c->external_id, 638344;
     is $c->photo, '74e3362283b6ef0c48686fb0e161da4043bbcc97.jpeg', 'photo exists';
     $problem->comments->delete;
+  };
 };
 
 subtest 'Update with customer_reference adds reference to problem' => sub {
@@ -557,7 +566,11 @@ subtest 'date for comment correct' => sub {
     my $o = Open311->new( jurisdiction => 'mysociety', endpoint => 'http://example.com', test_mode => 1, test_get_returns => { 'servicerequestupdates.xml' => $local_requests_xml } );
 
     my $update = Open311::GetServiceRequestUpdates->new( system_user => $user );
-    $update->update_comments( $o, $bodies{2482} );
+    FixMyStreet::override_config {
+        TIME_ZONE => 'Australia/Sydney',
+    }, sub {
+        $update->update_comments( $o, $bodies{2482} );
+    };
 
     my $comment = $problem->comments->first;
     is $comment->created, $dt, 'created date set to date from XML';
@@ -1082,7 +1095,11 @@ subtest 'check matching on fixmystreet_id overrides service_request_id' => sub {
         system_user => $user,
     );
 
-    $update->update_comments( $o, $bodies{2482} );
+    warning_like {
+        $update->update_comments( $o, $bodies{2482} )
+    }
+    qr/Failed to match comment to problem with fixmystreet id @{[$problem->external_id]} for Bromley/,
+    "warning emitted for bad fixmystreet id";
 
     $problem->discard_changes;
     is $problem->comments->count, 2, 'two comments after fetching updates';

@@ -158,7 +158,7 @@ sub _recent {
             # Need to reattach schema so that confirmed column gets reinflated.
             $probs->[0]->result_source->schema( $rs->result_source->schema ) if $probs->[0];
             # Catch any cached ones since hidden
-            $probs = [ grep { $_->photo && ! $_->is_hidden } @$probs ];
+            $probs = [ grep { $_->photo && ! $_->is_hidden && !$_->non_public } @$probs ];
         } else {
             $probs = [ $rs->search( $query, $attrs )->all ];
             Memcached::set($key, $probs, _cache_timeout());
@@ -273,7 +273,7 @@ sub categories_summary {
 sub include_comment_counts {
     my $rs = shift;
     my $order_by = $rs->{attrs}{order_by};
-    return $rs unless ref $order_by eq 'HASH' && $order_by->{-desc} eq 'comment_count';
+    return $rs unless ref $order_by eq 'ARRAY' && ref $order_by->[0] eq 'HASH' && $order_by->[0]->{-desc} eq 'comment_count';
     $rs->search({}, {
         '+select' => [ {
             "" => \'(select count(*) from comment where problem_id=me.id and state=\'confirmed\')',
