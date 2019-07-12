@@ -4481,7 +4481,7 @@ msgstr "Den positionen verkar inte vara i Sverige: försök gärna igen."
 #: perllib/FixMyStreet/Cobrand/FixaMinGata.pm:104
 #: perllib/FixMyStreet/Cobrand/UK.pm:73
 msgid "That postcode was not recognised, sorry."
-msgstr "Det postnummret finns tyvärr inte."
+msgstr "Det postnumret finns tyvärr inte."
 
 #: perllib/FixMyStreet/App/Controller/Admin.pm:918
 msgid "That problem has been marked as sent."
