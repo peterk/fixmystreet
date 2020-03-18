@@ -7,7 +7,6 @@
 # mySociety <transifex@mysociety.org>, 2020
 # Joe Siltberg <joe@joesiltberg.se>, 2020
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
