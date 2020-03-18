@@ -11,7 +11,8 @@ if cut -d/ -f2 /proc/self/cgroup | sort -u | grep -q docker ; then
     sudo bin/install_packages docker
 else
     # Fallback
-    sudo bin/install_packages generic
+    #    sudo bin/install_packages generic
+    echo "Skipping package installation on release branch..."
 fi
 
 bin/install_perl_modules
