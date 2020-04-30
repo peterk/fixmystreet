@@ -2,6 +2,32 @@
 
 * Unreleased
 
+=======
+    - Admin improvements:
+        - order unsent reports by confirmed date
+        - Disable staff private tickbox on new reports if category is private. #2961
+        - Move stats from main admin index to stats index.
+        - Speed up dashboard export and report search.
+    - Bugfixes
+        - Application user in Docker container can't install packages. #2914
+        - Look at all categories when sending reports.
+        - Provide access to staff-only categories in admin.
+        - Maintain group on pin move with same category in multiple groups. #2962
+    - Development improvements:
+        - Refactor Script::Report into an object.
+        - Move summary failures to a separate script.
+        - Add script to export/import body data.
+        - Add fetch script that does combined job of fetch-comments and fetch-reports.
+        - Show error page when submitting with web param to /import.
+        - Add a daemon option for sending reports and updates.
+        - Update Getopt::Long::Descriptive to stop warning.
+    - Open311 improvements:
+        - match response templates on external status code over state
+        - Add flag to protect category/group names from Open311 overwrite.
+    - UK:
+        - Added junction lookup, so you can search for things like "M60, Junction 2"
+>>>>>>> c33742a11... Update Getopt::Long::Descriptive to stop warning.
+
 * v3.0 (4th March 2020)
     - Security:
         - Fix XSS vulnerability in pagination page number.
