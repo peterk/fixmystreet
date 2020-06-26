@@ -330,7 +330,7 @@ msgstr "Lägg till telefonnummer"
 #: templates/web/base/report/_main.html:25
 #: templates/web/base/report/_main.html:36
 msgid "Add to shortlist"
-msgstr "Lägg till i slutlista"
+msgstr "Lägg till i din lista"
 
 #: templates/web/base/admin/users/edit.html:4
 #: templates/web/base/admin/users/index.html:95
@@ -357,11 +357,11 @@ msgstr "Lades till %s"
 
 #: templates/web/base/report/_main.html:158
 msgid "Adding this report to your shortlist will remove it from %s’s shortlist."
-msgstr "Att lägga till den här rapporten i din kortlista tar bort den från kortlistan för %s."
+msgstr "Att lägga till den här rapporten i din lista tar bort den från listan för %s."
 
 #: templates/web/base/main_nav_items.html:39
 msgid "Admin"
-msgstr "Administratörskontrollpanel"
+msgstr "Admin"
 
 #: templates/web/base/auth/change_password.html:51
 msgid "Again:"
@@ -2140,7 +2140,7 @@ msgstr "Gör till anonym på alla rapporter och uppdateringar"
 
 #: perllib/FixMyStreet/Cobrand/Default.pm:763
 msgid "Manage shortlist"
-msgstr "Hantera slutlista"
+msgstr "Hantera \"din lista\""
 
 #: perllib/FixMyStreet/Cobrand/Default.pm:688
 msgid "Manifest Theme"
@@ -3219,7 +3219,7 @@ msgstr "Rapport %d skapat"
 
 #: templates/web/base/admin/users/log.html:54
 msgid "Problem %s added to shortlist"
-msgstr "Rapport %s tillagd i slutlista"
+msgstr "Rapport %s tillagd i \"din lista\""
 
 #: templates/web/base/admin/timeline.html:24
 msgid "Problem %s confirmed"
@@ -3235,7 +3235,7 @@ msgstr "Rapport %s skapad för %s"
 
 #: templates/web/base/admin/users/log.html:56
 msgid "Problem %s removed from shortlist"
-msgstr "Rapport %s borttagen från slutlista"
+msgstr "Rapport %s borttagen från \"din lista\""
 
 #: templates/web/base/admin/timeline.html:26
 msgid "Problem %s sent to council %s"
@@ -3487,7 +3487,7 @@ msgstr "Ta bort flagga"
 #: templates/web/base/report/_main.html:24
 #: templates/web/base/report/_main.html:32
 msgid "Remove from shortlist"
-msgstr "Ta bort från slutlista"
+msgstr "Ta bort från din lista"
 
 #: templates/web/base/report/display_tools.html:7
 msgid "Remove from site"
@@ -3978,23 +3978,23 @@ msgstr "Kort namn"
 #: templates/web/base/report/_main.html:27
 #: templates/web/base/report/_main.html:35
 msgid "Shortlist"
-msgstr "Slutlista"
+msgstr "Din lista"
 
 #: templates/web/base/reports/body.html:39
 msgid "Shortlist all visible"
-msgstr "Kortlista alla synliga"
+msgstr "Lägg alla synliga i din lista"
 
 #: templates/web/base/report/_main.html:147
 #: templates/web/base/report/_main.html:26
 #: templates/web/base/report/_main.html:31
 #: templates/web/base/reports/_list-filter-status.html:24
 msgid "Shortlisted"
-msgstr "Satt på slutlistan"
+msgstr "Tillagd i din lista"
 
 #: templates/web/base/report/_item.html:15
 #: templates/web/base/report/_main.html:157
 msgid "Shortlisted by %s"
-msgstr "Satt på slutlistan av %s"
+msgstr "%s har den i sin lista"
 
 #: templates/web/base/report/update.html:23
 msgid "Show Photo?"
@@ -5030,7 +5030,7 @@ msgstr "Okänt uppdaterings-ID"
 
 #: templates/web/base/reports/_list-filter-status.html:25
 msgid "Unshortlisted"
-msgstr "Okortlistade"
+msgstr "Ej i din lista"
 
 #: templates/web/base/report/_item.html:26
 msgid "Up one"
@@ -5534,7 +5534,7 @@ msgstr "Du har inte skapat några rapporter än.  <a href=\"%s\">Rapportera ett 
 
 #: templates/web/base/my/planned.html:21
 msgid "You haven&rsquo;t shortlisted any reports yet."
-msgstr "Du har inte satt några rapporter på slutlistan än."
+msgstr "Du har inte några rapporter i din lista än."
 
 #: templates/web/base/admin/index.html:19
 msgid "You need to <a href=\"%s\">add some bodies</a> (such as councils or departments) before any reports can be sent."
@@ -5651,7 +5651,7 @@ msgstr "Dina rapporter"
 #: templates/web/base/my/planned.html:0 templates/web/base/my/planned.html:18
 #: templates/web/base/my/planned.html:5
 msgid "Your shortlist"
-msgstr "Din slutlista"
+msgstr "Din lista"
 
 #: templates/web/base/auth/generate_token.html:8
 msgid "Your token has been generated"
