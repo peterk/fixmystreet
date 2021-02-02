@@ -13,7 +13,12 @@
 [% select_category = BLOCK %]
   [% IF filter_categories.size %]
     [% SET filter_group = c.get_param('filter_group') %]
-    <select class="form-control js-multiple" name="filter_category" id="filter_categories" multiple data-all="[% loc('Everything') %]">
+    [%  options = [];
+        FOR cat IN filter_categories;
+            options.push(cat.category);
+        END;
+    %]	
+    <select class="form-control js-multiple" name="filter_category" id="filter_categories" multiple data-all="[% loc('Everything') %]" data-all-options='["[% options.join('", "') %]"]'>
       [% IF category_groups %]
         [% FOR group IN category_groups %]
           <optgroup label="[% group.name %]">
