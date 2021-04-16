@@ -130,7 +130,7 @@ function isR2L() {
             settings.presets = [];
             settings.presets.push({
                 name: settings.allText,
-                options: $select.data('all-options') || []
+                all: true
             });
         }
 
