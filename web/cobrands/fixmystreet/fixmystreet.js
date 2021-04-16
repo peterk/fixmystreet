@@ -1632,6 +1632,7 @@ fixmystreet.display = {
                 fixmystreet.maps.setup_inspector();
             }
 
+	    $('.js-contribute-as').change();
 
             if (typeof callback === 'function') {
                 callback();
